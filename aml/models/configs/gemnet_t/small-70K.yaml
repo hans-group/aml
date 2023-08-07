@@ -1,0 +1,22 @@
+energy_model:
+  "@name": gemnet_t
+  species: ["C", "H"]        # Placeholder
+  cutoff: 5.0                # Cutoff radius for neighbor list
+  num_spherical: 7
+  num_radial: 32
+  num_blocks: 2
+  emb_size_atom: 32
+  emb_size_edge: 32
+  emb_size_trip: 16
+  emb_size_rbf: 8
+  emb_size_cbf: 8
+  emb_size_bil_trip: 16
+  num_before_skip: 1
+  num_after_skip: 2
+  num_concat: 1
+  num_atom: 2
+  num_elements: 83  
+compute_force: true          # Compute force or not
+compute_stress: false        # Compute stress or not
+compute_hessian: false       # Compute hessian or not
+

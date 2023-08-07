@@ -1,0 +1,18 @@
+energy_model:
+  "@name": mace
+  species: ["C", "H"]                       # Placeholder
+  cutoff: 5.0                               # Cutoff radius for neighbor list
+  num_bessel: 8                             # Number of Bessel type radial basis functions
+  num_polynomial_cutoff: 5                  # Number of smooth cutoff functions
+  num_interactions: 2                       # Number of interaction blocks
+  residual_first_interaction: false         # If true, use residual block for the first interaction block
+  l_max: 3                                  # Maximum 'l' value for spherical harmonics
+  hidden_irreps: 128x0e + 128x1o + 128x2e   # Irreducible representation for hidden layers
+  correlation: 3                            # Maximum correlation in multibody expansion. Up to (corr + 1) body considered
+  MLP_irreps: 16x0e                         # Irreducible representation for the last MLP layer
+  gate: silu                                # Type of nonlinearity gate
+  atomic_energies: null                     # Atomic energies
+  avg_num_neighbors: null                   # Average number of neighbors
+compute_force: true                         # Compute force or not
+compute_stress: false                       # Compute stress or not
+compute_hessian: false                      # Compute hessian or not

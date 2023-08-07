@@ -1,0 +1,13 @@
+energy_model:
+  "@name": schnet
+  species: ["C", "H"]        # Placeholder
+  cutoff: 5.0                # Cutoff radius for neighbor list
+  hidden_channels: 32        # Number of channels in hidden layers
+  n_filters: 32              # Number of filters in convolution
+  n_interactions: 4          # Number of interaction blocks
+  rbf_type: "gaussian"       # Type of radial basis function for edge expansion. "gaussian" or "bessel"
+  n_rbf: 16                  # Number of rbf values. Do not use more than 20 for bessel rbf.
+  trainable_rbf: false       # Trainable RBF layer or not
+compute_force: true          # Compute force or not
+compute_stress: false        # Compute stress or not
+compute_hessian: false       # Compute hessian or not

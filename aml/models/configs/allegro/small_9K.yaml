@@ -1,0 +1,32 @@
+energy_model:
+    "@name": allegro                        # Name of the model.
+    species: [Pt, Ru]                       # Species to consider.
+    cutoff: 5.0
+    cutoff_p: 6
+    num_layers: 1
+    l_max: 1
+    parity: o3_full
+    num_basis: 8
+    trainable_basis: false
+    normalize_basis: true
+    two_body_latent_mlp_latent_dimensions: [32, 64]
+    latent_mlp_latent_dimensions: [64]
+    env_embed_multiplicity: 1
+    edge_eng_mlp_latent_dimensions: [32]
+    avg_num_neighbors: null
+    # Advanced options
+    r_start_cos_ratio: 0.8
+    per_layer_cutoffs: null
+    edge_sh_normalize: true
+    edge_sh_normalization: component
+    embed_initial_edge: true
+    linear_after_env_embed: false
+    nonscalars_include_parity: true
+    latent_resnet: true
+    latent_resnet_update_ratios: null
+    latent_resnet_update_ratios_learnable: false
+    pad_to_alignment: 1
+    sparse_mode: null
+compute_force: true          # Compute force or not
+compute_stress: false        # Compute stress or not
+compute_hessian: false       # Compute hessian or not

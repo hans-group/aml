@@ -1,0 +1,95 @@
+# Config for model
+model: 
+  energy_model: 
+      "@name": "schnet"                        # Name of the model.
+      species: ["C", "H", "O"]                 # Species to consider.
+      cutoff: &cutoff 5.0                      # Cutoff radius for neighbor list
+      # Model specific parameters
+      hidden_channels: 128       
+      n_filters: 128             
+      n_interactions: 6          
+      rbf_type: "gaussian"       
+      n_rbf: 50                  
+      trainable_rbf: false       
+  compute_force: true
+  compute_stress: false
+  compute_hessian: false
+# Config for dataset
+train_dataset:
+  data_source: "path/to/data"        # Any ASE-readable format
+  index: ":"                         # Indices to read (query params are OK for ase DB format)
+  neighborlist_cutoff: *cutoff                 # Cutoff for neighborlist.
+  neighborlist_backend: &nbr_backend "matscipy"     # Backend for computing neighborlist. Use "ase" for small cells (< 2 * cutoff). Otherwise "matscipy" is much more fast
+  atomref_energies:                  # (Optional) Reference energies for single-atom system.
+    H: -13.568
+    C: -1027.264
+    O: -2038.533
+test_dataset: # Optional
+  data_source: "path/to/data"        # Any ASE-readable format
+  index: ":"                         # Indices to read (query params are OK for ase DB format)
+  neighborlist_cutoff: *cutoff                 # Cutoff for neighborlist.
+  neighborlist_backend: *nbr_backend
+  atomref_energies:                  # (Optional) Reference energies for single-atom system.
+    H: -13.568
+    C: -1027.264
+    O: -2038.533
+val_size: 0.1                                  # Fraction of train dataset to be used as validation dataset
+batch_size: 4                            # Batch size
+dataset_cache_dir: "data"                    # If not null, processed dataset will be cached.
+shift_by_avg_atomic_energy: true        # Shift energies by average atomic energies per species
+scale_by_force_rms: true                # Scale energies by RMS of force
+dataset_scale_stride: null              # Set this to positive integer when dataset is large (>50000)
+trainable_scales: true
+
+# Hyperparameters for training
+## Global config
+project_name: "myproject"                 # Name of the project
+experiment_name: "schnet_test"                      # Name of the experiment
+train_force: True                              # Whether to train force or not
+train_stress: False                            # Whether to train stress or not. Only available for periodic system
+max_epochs: 100000000                          # Maximum number of epochs
+device: "cuda"                                 # Device to use. 'cpu' or 'cuda'
+restart_from_checkpoint: null                  # if set as ckpt path, restart training from it
+## Logging
+logger: false                         # Logger to use. tensorboard or wandb available
+log_every_n_steps: 50                          # Logging frequency
+checkpoint_monitor: "val_loss"                 # Monitor metric for checkpointing best model
+checkpoint_mode: "min"                         
+checkpoint_save_last: True                     # Whether save last model or not
+
+## Loss and metrics
+loss_weights:                                  # Weights of individual loss per property
+  energy: 0.01
+  force: 1.00
+  # stress: 1.0
+loss_type: "mse_loss"                          # Type of loss function. "mse_loss" or "huber_loss"
+per_atom_energy_loss: false                     # If true, energy loss will be computed with per-atom energy
+metrics:                                       # Metrics to log
+  - "energy_mae"
+  - "per_atom_energy_mae"
+  - "force_mae"
+  # - "stress_mae"
+  - "energy_rmse"
+  - "per_atom_energy_rmse"
+  - "force_rmse"
+  # - "stress_rmse"
+
+# Optimization
+optimizer: "adam"                              # Optimizer name. See `torch.optim` for all optimizers
+lr: 1.0e-3                                     # Learning rate.
+weight_decay: 0.0                              # Weight decay
+optimizer_kwargs:                              # Optimizer-specific parameters
+  amsgrad: true                               
+lr_scheduler: reduce_lr_on_plateau             # Learning rate scheduler. See `torch` for details
+lr_scheduler_kwargs:                           # Scheduler-specific parameters
+  patience: 25                                 # Reduce lr when val_loss does not improve with certain steps
+  factor: 0.5                                  # Reduce lr by this factor
+  mode: "min"                                  # Improvement means minimization of val_loss
+  min_lr: 1.0e-6                               # Minimum lr
+early_stopping: True                           # Use early stopping
+early_stopping_monitor: "lr"                   # Monitor metric for early stopping
+early_stopping_mode: "min"
+early_stopping_patience: 100000000000
+early_stopping_threshold: 1.0e-6
+gradient_clip_val: 5.0                         # Clip gradients when training
+ema_decay: 0.999                               # Decay weight for smooth improvement of loss using expotential moving average (EMA)

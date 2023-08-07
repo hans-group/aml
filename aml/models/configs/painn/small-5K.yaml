@@ -1,0 +1,16 @@
+energy_model:
+  "@name": painn
+  species: ["C", "H"]        # Placeholder
+  cutoff: 5.0                # Cutoff radius for neighbor list
+  hidden_channels: 16        # Number of channels in hidden layers
+  n_interactions: 3          # Number of interaction blocks
+  rbf_type: "bessel"         # Type of radial basis function for edge expansion. "gaussian" or "bessel"
+  n_rbf: 8                   # Number of rbf values. Do not use more than 20 for bessel rbf.
+  trainable_rbf: false       # Trainable RBF layer or not
+  activation: "silu"         # Activation function
+  shared_interactions: true # Share the parameters through interaction blocks
+  shared_filters: true      # Share the filters thrhough convolutions
+  epsilon: 1.0e-8              # Small number for stability
+compute_force: true          # Compute force or not
+compute_stress: false        # Compute stress or not
+compute_hessian: false       # Compute hessian or not

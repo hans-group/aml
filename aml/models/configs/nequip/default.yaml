@@ -1,0 +1,25 @@
+energy_model:
+  "@name": nequip
+  species: ["C", "H"]        # Placeholder
+  cutoff: 5.0                # Cutoff radius for neighbor list
+  num_layers: 4
+  l_max: 1
+  num_features: 64
+  parity: true
+  invariant_layers: 2
+  invariant_neurons: 64
+  use_sc: true
+  num_radial_basis: 8
+  trainable_radial_basis: true
+  polynomial_cutoff_p: 6.0
+  resnet: false
+  nonlinearity_scalars:
+    e: silu
+    o: tanh
+  nonlinearity_gates:
+    e: silu
+    o: tanh
+  avg_num_neighbors: null
+compute_force: true          # Compute force or not
+compute_stress: false        # Compute stress or not
+compute_hessian: false       # Compute hessian or not
