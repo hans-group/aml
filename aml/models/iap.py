@@ -18,12 +18,14 @@ class InterAtomicPotential(BaseModel):
         compute_force: bool = True,
         compute_stress: bool = False,
         compute_hessian: bool = False,
+        return_embeddings: bool = False,
     ):
         super().__init__()
         self.energy_model = energy_model
         self._compute_force = compute_force
         self._compute_stress = compute_stress
         self._compute_hessian = compute_hessian
+        self.return_embeddings = return_embeddings
 
         grad_input_keys = []
         self.require_grad_keys = []
@@ -150,6 +152,10 @@ class InterAtomicPotential(BaseModel):
                 count_node = count_node + num_nodes
 
             outputs[K.stress] = torch.stack(sts)
+
+        if self.return_embeddings:
+            for key in self.energy_model.embedding_keys:
+                outputs[key] = data[key].detach()
         return outputs
 
     def get_config(self) -> dict:

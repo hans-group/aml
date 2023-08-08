@@ -11,6 +11,8 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("schnet")
 class SchNet(BaseEnergyModel):
+    embedding_keys = [K.node_features]
+
     def __init__(
         self,
         species,

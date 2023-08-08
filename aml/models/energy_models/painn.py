@@ -13,6 +13,8 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("painn")
 class PaiNN(BaseEnergyModel):
+    embedding_keys = [K.node_features, K.node_vec_features]
+
     def __init__(
         self,
         species,

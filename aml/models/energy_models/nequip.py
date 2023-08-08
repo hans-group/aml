@@ -17,6 +17,7 @@ from aml.nn.nequip import (
 from aml.nn.nequip import additional_keys as AK
 from aml.nn.nequip.graph_mixin import GraphModuleMixin
 from aml.nn.nequip.utils import _irreps_compatible
+from aml.nn.scale import PerSpeciesScaleShift
 from aml.typing import DataDict, Tensor
 
 from .base import BaseEnergyModel
@@ -90,6 +91,8 @@ class AtomTypeMapping(torch.nn.Module):
 
 @registry.register_energy_model("nequip")
 class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
+    embedding_keys = [K.node_features, K.node_vec_features]
+
     def __init__(
         self,
         species: list[str],
@@ -154,6 +157,11 @@ class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
             layers = OrderedDict((f"module{i}", m) for i, m in enumerate(module_list))
         torch.nn.Sequential.__init__(self, layers)
         self.atom_type_mapping = AtomTypeMapping(species)
+        self.species_energy_scale = PerSpeciesScaleShift(species)
+
+        hidden_irreps = o3.Irreps(self.irreps_config["feature_irreps_hidden"])
+        self.num_scalar_features = hidden_irreps.count("0e")
+        self.num_vector_features = hidden_irreps.count("1e")
 
     def _build_layers(self) -> dict:
         layers = {}
@@ -198,13 +206,15 @@ class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
                 },
             )
         layers["convnet_to_output_hidden"] = AtomwiseLinear(
+            out_field="node_hidden_features",
             irreps_in=list(layers.values())[-1].irreps_out,
             irreps_out=self.irreps_config["conv_to_output_hidden_irreps_out"],
         )
         layers["output_hidden_to_scalar"] = AtomwiseLinear(
+            field="node_hidden_features",
+            out_field=K.atomic_energy,
             irreps_in=layers["convnet_to_output_hidden"].irreps_out,
             irreps_out="1x0e",
-            out_field=K.node_features,
         )
         return layers
 
@@ -213,8 +223,16 @@ class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
         for module in self:
             if module._get_name() not in ("GlobalScaleShift", "PerSpeciesScaleShift"):
                 data = module(data)
-        energy_i = data[K.node_features].squeeze(-1)
+        energy_i = data[K.atomic_energy].squeeze(-1)
         energy_i = self.species_energy_scale(data, energy_i)
         # Compute system energy
         energy = scatter(energy_i, data[K.batch], dim=0, reduce="sum")
+
+        # Embeddings
+        node_features = data[K.node_features]
+        data[K.node_features] = node_features[:, : self.num_scalar_features]
+        data[K.node_vec_features] = node_features[
+            :, self.num_scalar_features : self.num_scalar_features + self.num_vector_features * 3  # noqa
+        ].view(-1, self.num_vector_features, 3)
+
         return energy

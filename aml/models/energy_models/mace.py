@@ -51,6 +51,8 @@ def to_one_hot(indices: torch.Tensor, num_classes: int) -> torch.Tensor:
 
 @registry.register_energy_model("mace")
 class MACE(BaseEnergyModel):
+    embedding_keys = [K.node_features]
+
     def __init__(
         self,
         species: List[str],
@@ -229,6 +231,8 @@ class MACE(BaseEnergyModel):
         # Sum over energy contributions
         contributions = torch.stack(energies, dim=-1)
         total_energy = torch.sum(contributions, dim=-1)  # [n_graphs, ]
+
+        data[K.node_features] = node_feats  # Only scalar node features
 
         return total_energy
 

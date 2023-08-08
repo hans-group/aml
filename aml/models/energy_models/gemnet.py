@@ -92,6 +92,8 @@ class GemNetT(BaseEnergyModel):
 
     """
 
+    embedding_keys = [K.node_features, K.edge_features]
+
     def __init__(
         self,
         species: list[str],
@@ -497,4 +499,6 @@ class GemNetT(BaseEnergyModel):
         energy_i = E_t.squeeze(-1)
         energy_i = self.species_energy_scale(data, energy_i)
         energy = scatter(energy_i, data[K.batch], dim=0, reduce="sum")
+        data[K.node_features] = h
+        data[K.edge_features] = m
         return energy

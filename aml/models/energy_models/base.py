@@ -12,6 +12,8 @@ from aml.nn.scale import PerSpeciesScaleShift
 
 @registry.register_energy_model("base")
 class BaseEnergyModel(torch.nn.Module, ABC):
+    embedding_keys = []
+
     def __init__(self, species: list[str], cutoff: float = 5.0, *args, **kwargs):
         super().__init__()
         self.species = species

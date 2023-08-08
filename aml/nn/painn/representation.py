@@ -110,7 +110,7 @@ class PaiNNRepresentation(torch.nn.Module):
 
         q = q.squeeze(1)
 
-        data[K.node_features] = q
-        data[K.node_vec_features] = mu
+        data[K.node_features] = q  # (n_atoms, n_features)
+        data[K.node_vec_features] = mu.swapaxes(-2, -1)  # (n_atoms, n_features, 3)
 
         return data

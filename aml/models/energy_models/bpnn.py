@@ -19,6 +19,8 @@ from .base import BaseEnergyModel
 class BPNN(BaseEnergyModel):
     """Behler-Parrinello Neural Network (BPNN) force field model."""
 
+    embedding_keys = [K.node_features]
+
     def __init__(
         self,
         species: list[str],
