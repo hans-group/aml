@@ -100,7 +100,7 @@ class ASEDataset(InMemoryDataset):
         return item
 
     def save(self, path):
-        torch.save((self.__args, self.data, self.slices), path)
+        torch.save((self.__args, self._data, self.slices), path)
 
     @classmethod
     def load(cls, path):
