@@ -114,7 +114,7 @@ def compute_neighbor_vecs(data: AtomsGraph) -> AtomsGraph:
     pos = data[K.pos]
     edge_index = data[K.edge_index]  # neighbors
     edge_shift = data[K.edge_shift]  # shift vectors
-    cell = data[K.cell]
+    cell = data[K.cell] if "cell" in data else torch.zeros((batch.max() + 1, 3, 3)).to(pos.device)
     idx_i = edge_index[1]
     idx_j = edge_index[0]
 
