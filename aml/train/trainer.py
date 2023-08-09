@@ -147,10 +147,7 @@ class PotentialTrainer:
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.experiment_dir = Path("experiments") / self.experiment_name
-        self.experiment_dir.mkdir(parents=True, exist_ok=True)
         self.dataset_cache_dir = Path(dataset_cache_dir) if dataset_cache_dir is not None else None
-        if self.dataset_cache_dir is not None:
-            self.dataset_cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.trainer = None
 
@@ -251,6 +248,9 @@ class PotentialTrainer:
         return logger
 
     def train(self) -> None:
+        self.experiment_dir.mkdir(parents=True, exist_ok=True)
+        if self.dataset_cache_dir is not None:
+            self.dataset_cache_dir.mkdir(parents=True, exist_ok=True)
         print(f"Training {self.experiment_name}...")
         print(f"Experiment directory: {self.experiment_dir}")
         print("Building model...")
