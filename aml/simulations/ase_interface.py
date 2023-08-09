@@ -34,14 +34,16 @@ class AMLCalculator(Calculator):  # noqa: F821
         compute_force: bool = True,
         compute_stress: bool = False,
         compute_hessian: bool = False,
-        device: str = "cpu",
-        neighborlist_backend: Literal["ase", "matscipy"] = "matscipy",
+        device: str | None = None,
+        neighborlist_backend: Literal["ase", "matscipy"] = "ase",
         neighborlist_skin: float = 0.0,  # tolerance os pos change for neighborlist update
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.device = device
-        self.model = model.to(device)
+        self.model = model
+        if device is not None:
+            self.model = self.model.to(device)
         self.model.eval()
         self.compute_force = compute_force
         self.compute_stress = compute_stress
