@@ -155,7 +155,7 @@ class InterAtomicPotential(BaseModel):
 
         if self.return_embeddings:
             for key in self.energy_model.embedding_keys:
-                outputs[key] = data[key].detach()
+                outputs[key] = data[key]
         return outputs
 
     def get_config(self) -> dict:
