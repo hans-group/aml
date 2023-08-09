@@ -1,9 +1,11 @@
 from copy import deepcopy
 
 import torch
+from ase import Atoms
 
 from aml.common.utils import compute_neighbor_vecs, load_config
 from aml.data import keys as K
+from aml.data.data_structure import AtomsGraph
 from aml.models.energy_models.base import BaseEnergyModel
 from aml.nn.grad import ComputeGradient
 from aml.typing import DataDict, OutputDict
@@ -110,7 +112,7 @@ class InterAtomicPotential(BaseModel):
         if self.compute_force:
             outputs[K.force] = -grad_vals[K.pos]
             if self._compute_hessian:
-                r = outputs[K.force].view(-1)
+                r = -outputs[K.force].view(-1)
                 s = r.size(0)
                 hessian = outputs[K.energy].new_zeros((s, s))
                 for iatom in range(s):
@@ -156,6 +158,13 @@ class InterAtomicPotential(BaseModel):
         if self.return_embeddings:
             for key in self.energy_model.embedding_keys:
                 outputs[key] = data[key]
+        return outputs
+
+    def forward_atoms(self, atoms: Atoms, neighborlist_backend="ase") -> OutputDict:
+        data = AtomsGraph.from_ase(atoms, self.energy_model.cutoff, neighborlist_backend=neighborlist_backend)
+        device = self.parameters().__next__().device
+        data = data.to(device)
+        outputs = self(data)
         return outputs
 
     def get_config(self) -> dict:
