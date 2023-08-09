@@ -83,7 +83,7 @@ class AtomsGraph(Data):
     def from_ase(
         cls,
         atoms: Atoms,
-        cutoff: float | None = 5.0,
+        neighborlist_cutoff: float | None = None,
         self_interaction: bool = False,
         energy: float = None,
         force: Tensor = None,
@@ -143,8 +143,8 @@ class AtomsGraph(Data):
         atoms_graph = cls(
             elems, pos, cell, None, None, energy, force, stress, n_atoms=n_atoms, add_batch=add_batch, **kwargs
         )
-        if cutoff is not None:
-            atoms_graph.build_neighborlist(cutoff, self_interaction, neighborlist_backend)
+        if neighborlist_cutoff is not None:
+            atoms_graph.build_neighborlist(neighborlist_cutoff, self_interaction, neighborlist_backend)
         return atoms_graph
 
     def build_neighborlist(
