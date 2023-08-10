@@ -28,6 +28,7 @@ class InterAtomicPotential(BaseModel):
         self._compute_stress = compute_stress
         self._compute_hessian = compute_hessian
         self.return_embeddings = return_embeddings
+        self.cutoff = self.energy_model.get_cutoff()
 
         grad_input_keys = []
         self.require_grad_keys = []
