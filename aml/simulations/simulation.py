@@ -56,15 +56,18 @@ class Simulation(ABC):
         log_and_print(log_str, self.log_file)
 
     @abstractmethod
-    def step(self) -> None:
+    def step(self) -> bool:
+        """A single step of the simulation. Returns True if the simulation should stop."""
         pass
 
     def run(self, n_steps: int) -> None:
         for n in range(1, n_steps + 1):
-            self.step()
+            stop = self.step()
             if n % self.log_interval == 0:
                 self._log()
             if self.trajectory is not None and n % self.trajectory_interval == 0:
                 with self.traj_writer as w:
                     w.write(self.atoms)
+            if stop:
+                break
             self._step += 1
