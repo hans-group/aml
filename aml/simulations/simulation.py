@@ -20,6 +20,8 @@ class Simulation(ABC):
         append_trajectory: bool = False,
     ):
         self.atoms = atoms
+        if atoms.calc is None:
+            raise ValueError("Atoms object must have a calculator.")
         self.log_file = log_file
         if log_file is not None:
             if os.path.exists(log_file):
