@@ -168,13 +168,13 @@ class AtomsGraph(Data):
         else:
             pbc = True
         atoms = Atoms(
-            numbers=self.elems.cpu().numpy(),
-            positions=self.pos.cpu().numpy(),
-            cell=self.cell.cpu().numpy()[0] if pbc else None,
+            numbers=self.elems.detach().cpu().numpy(),
+            positions=self.pos.detach().cpu().numpy(),
+            cell=self.cell.detach().cpu().numpy()[0] if pbc else None,
             pbc=pbc,
         )
-        energy = self.energy.cpu().item() if "energy" in self else None
-        forces = self.force.cpu().numpy() if "force" in self else None
+        energy = self.energy.detach().cpu().item() if "energy" in self else None
+        forces = self.force.detach().cpu().numpy() if "force" in self else None
         if energy is not None or forces is not None:
             atoms.calc = SinglePointCalculator(atoms, energy=energy, forces=forces)
         return atoms
