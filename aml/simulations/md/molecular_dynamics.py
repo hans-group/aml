@@ -92,10 +92,11 @@ class MolecularDynamics(Simulation):
             log_entry["rho (g/cm3)"] = self.atoms.get_masses().sum() / self.atoms.get_volume() / units.mol * 1e24
         return log_entry
 
-    def step(self):
+    def step(self) -> bool:
         self.dyn.run(1)
         if self.ensemble != "nve":
             self.dyn.set_temperature(temperature_K=self.temperature())
+        return False
 
     def run(self, n_steps: int) -> None:
         if self.temperature.n_steps is not None and self.temperature.n_steps != n_steps:
