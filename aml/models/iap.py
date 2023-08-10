@@ -13,6 +13,54 @@ from aml.typing import DataDict, OutputDict
 from .base import BaseModel
 
 
+def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_hessian: bool = False):
+    engrad = grad_vals[K.pos]
+    outputs[K.force] = -engrad
+    if compute_hessian:
+        r = -outputs[K.force].view(-1)
+        s = r.size(0)
+        hessian = outputs[K.energy].new_zeros((s, s))
+        for iatom in range(s):
+            tmp = torch.autograd.grad([r[iatom]], [data[K.pos]], retain_graph=iatom < s)[0]
+            if tmp is not None:
+                hessian[iatom] = tmp.view(-1)
+        outputs[K.hessian] = hessian
+
+
+def get_stress(data: DataDict, outputs: OutputDict, grad_vals: DataDict):
+    engrad_ij = grad_vals[K.edge_vec]
+    F_ij = -engrad_ij
+    sts = []
+    count_edge = 0
+    count_node = 0
+    batch_size = int(data[K.batch].max() + 1)
+    for i in range(batch_size):
+        batch = data[K.batch]
+        num_nodes = 0
+        edge_batch = batch[data[K.edge_index][1, :]]
+        num_edges = (edge_batch == i).sum()
+        cell = data[K.cell][i]
+        volume = torch.det(cell)
+        if volume < 1e-6:
+            raise RuntimeError("Volume of cell is too small or zero. Make sure that the system is periodic.")
+        sts.append(
+            -1
+            * (
+                torch.matmul(
+                    data[K.edge_vec][count_edge : count_edge + num_edges].T,  # noqa
+                    F_ij[count_edge : count_edge + num_edges],  # noqa
+                )
+                / volume
+            )
+        )
+        count_edge = count_edge + num_edges
+        num_nodes = (batch == i).sum()
+        count_node = count_node + num_nodes
+
+    outputs[K.stress] = torch.stack(sts)
+    return outputs
+
+
 class InterAtomicPotential(BaseModel):
     def __init__(
         self,
@@ -45,7 +93,7 @@ class InterAtomicPotential(BaseModel):
         return self._compute_force
 
     @compute_force.setter
-    def compute_force(self, value):
+    def compute_force(self, value: bool):
         self._compute_force = value
         if value:
             if K.pos not in self.require_grad_keys:
@@ -63,7 +111,7 @@ class InterAtomicPotential(BaseModel):
         return self._compute_stress
 
     @compute_stress.setter
-    def compute_stress(self, value):
+    def compute_stress(self, value: bool):
         self._compute_stress = value
         if value:
             if K.edge_vec not in self.require_grad_keys:
@@ -81,13 +129,14 @@ class InterAtomicPotential(BaseModel):
         return self._compute_hessian
 
     @compute_hessian.setter
-    def compute_hessian(self, value):
+    def compute_hessian(self, value: bool):
         self._compute_hessian = value
         if value:
             self.compute_grad.second_order_required = True
         else:
             self.compute_grad.second_order_required = False
 
+    @torch.jit.unused
     @property
     def output_keys(self) -> tuple[str, ...]:
         keys = [K.energy]
@@ -111,50 +160,10 @@ class InterAtomicPotential(BaseModel):
         grad_vals = self.compute_grad(data, outputs)
 
         if self.compute_force:
-            outputs[K.force] = -grad_vals[K.pos]
-            if self._compute_hessian:
-                r = -outputs[K.force].view(-1)
-                s = r.size(0)
-                hessian = outputs[K.energy].new_zeros((s, s))
-                for iatom in range(s):
-                    tmp = torch.autograd.grad([r[iatom]], data[K.pos], retain_graph=iatom < s)[0]
-                    if tmp is not None:
-                        hessian[iatom] = tmp.view(-1)
-                outputs[K.hessian] = hessian
+            get_force(data, outputs, grad_vals, self._compute_hessian)
 
         if self.compute_stress:
-            engrad_ij = grad_vals[K.edge_vec]
-            if engrad_ij is None:
-                engrad_ij = torch.zeros_like(data[K.edge_vec])
-            F_ij = -engrad_ij
-            sts = []
-            count_edge = 0
-            count_node = 0
-            batch_size = int(data[K.batch].max() + 1)
-            for i in range(batch_size):
-                batch = data[K.batch]
-                num_nodes = 0
-                edge_batch = batch[data[K.edge_index][1, :]]
-                num_edges = (edge_batch == i).sum()
-                cell = data[K.cell][i]
-                volume = torch.det(cell)
-                if volume < 1e-6:
-                    raise RuntimeError("Volume of cell is too small or zero. Make sure that the system is periodic.")
-                sts.append(
-                    -1
-                    * (
-                        torch.matmul(
-                            data[K.edge_vec][count_edge : count_edge + num_edges].T,  # noqa
-                            F_ij[count_edge : count_edge + num_edges],  # noqa
-                        )
-                        / volume
-                    )
-                )
-                count_edge = count_edge + num_edges
-                num_nodes = (batch == i).sum()
-                count_node = count_node + num_nodes
-
-            outputs[K.stress] = torch.stack(sts)
+            get_stress(data, outputs, grad_vals)
 
         if self.return_embeddings:
             for key in self.energy_model.embedding_keys:

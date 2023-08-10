@@ -1,6 +1,7 @@
 import torch
 
 from aml.data import keys as K
+from aml.typing import DataDict
 
 from ..radial_basis import BesselRBF, GaussianRBF
 from .interaction import SchnetInteractionBlock
@@ -45,7 +46,7 @@ class SchNetRepresentation(torch.nn.Module):
         for interaction in self.interactions:
             interaction.reset_parameters()
 
-    def forward(self, data):
+    def forward(self, data: DataDict) -> DataDict:
         z = data[K.elems]
         edge_index = data[K.edge_index]  # neighbors
         edge_vec = data[K.edge_vec]  # vectors to neighbors

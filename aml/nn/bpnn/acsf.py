@@ -5,6 +5,7 @@ from torch_geometric.utils import scatter
 from torch_sparse import SparseTensor
 from tqdm import tqdm
 
+from aml.common.sparse_utils import sp_getitem
 from aml.common.utils import canocialize_species
 from aml.data import keys as K
 from aml.nn.cutoff import CosineCutoff
@@ -141,8 +142,8 @@ class G4Func(SymFunc):
         num_nodes = pos.size(0)
         value = torch.arange(j.size(0), device=i.device)
         adj_t = SparseTensor(row=i, col=j, value=value, sparse_sizes=(num_nodes, num_nodes))
-        adj_t_row = adj_t[j]
-        num_triplets = adj_t_row.set_value(None).sum(dim=1).to(torch.long)
+        adj_t_row = sp_getitem(adj_t, j)
+        num_triplets = adj_t_row.set_value(None).storage.rowcount().to(torch.long)
 
         # Node indices (k->j->i) for triplets.
         idx_i = i.repeat_interleave(num_triplets)
@@ -169,9 +170,9 @@ class G4Func(SymFunc):
         vec_ij = pos[idx_j] - pos_i + torch.einsum("ni,nij->nj", edge_shift_i, cell[batch[idx_i]])
         vec_ik = pos[idx_k] - pos_i + torch.einsum("ni,nik->nk", edge_shift_i, cell[batch[idx_i]])
 
-        r_ij = vec_ij.norm(dim=-1)
-        r_ik = vec_ik.norm(dim=-1)
-        r_jk = (vec_ik - vec_ij).norm(dim=-1)
+        r_ij = torch.linalg.norm(vec_ij, dim=-1)
+        r_ik = torch.linalg.norm(vec_ik, dim=-1)
+        r_jk = torch.linalg.norm(vec_ik - vec_ij, dim=-1)
         cos_ijk = (vec_ij * vec_ik).sum(dim=-1) / (r_ij * r_ik + 1e-12)
         return r_ij, r_ik, r_jk, cos_ijk
 
@@ -202,7 +203,8 @@ class G4Func(SymFunc):
         for sp in self.species:
             mask = torch.logical_and(z[idx_j] == sp, z[idx_k] == sp)
             G4_i.append(scatter(G4_ijk * mask, idx_i, dim_size=pos.size(0), reduce="sum", dim=-1) / 2)
-        for sp_j, sp_k in torch.combinations(self.species):
+        for sps in torch.combinations(self.species):
+            sp_j, sp_k = sps[0], sps[1]
             mask_1 = torch.logical_and(z[idx_j] == sp_j, z[idx_k] == sp_k)
             mask_2 = torch.logical_and(z[idx_j] == sp_k, z[idx_k] == sp_j)
             mask = torch.logical_or(mask_1, mask_2)
@@ -243,7 +245,8 @@ class G5Func(G4Func):
         for sp in self.species:
             mask = torch.logical_and(z[idx_j] == sp, z[idx_k] == sp)
             G5_i.append(scatter(G5_ijk * mask, idx_i, dim_size=pos.size(0), reduce="sum", dim=-1) / 2)
-        for sp_j, sp_k in torch.combinations(self.species):
+        for sps in torch.combinations(self.species):
+            sp_j, sp_k = sps[0], sps[1]
             mask_1 = torch.logical_and(z[idx_j] == sp_j, z[idx_k] == sp_k)
             mask_2 = torch.logical_and(z[idx_j] == sp_k, z[idx_k] == sp_j)
             mask = torch.logical_or(mask_1, mask_2)

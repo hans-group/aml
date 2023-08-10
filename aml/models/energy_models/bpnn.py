@@ -38,7 +38,7 @@ class BPNN(BaseEnergyModel):
         self.acsf = ACSF(species=species, params=self.acsf_params, cutoff=cutoff)
         self.element_nets = torch.nn.ModuleList()
         layer_shape = (self.acsf.n_descriptors, *hidden_layers, 1)
-        for _ in species:
+        for _ in self.atomic_numbers:
             layers = []
             for n_in, n_out in itertools.pairwise(layer_shape[:-1]):
                 layers.append(torch.nn.Linear(n_in, n_out))
@@ -67,9 +67,10 @@ class BPNN(BaseEnergyModel):
         # initialize the output
         energy_i = torch.zeros(size=(G.shape[0], 1), device=G.device, dtype=G.dtype)
         # Apply decoder
-        for i, elem in enumerate(self.atomic_numbers):
-            mask = data[K.elems] == elem
-            energy_i[mask] = self.element_nets[i](G[mask])
+        for i, net in enumerate(self.element_nets):
+            mask = data[K.elems] == self.atomic_numbers[i]
+            energy_i[mask] = net(G[mask])
+
         energy_i = energy_i.squeeze(-1)
         energy_i = self.species_energy_scale(data, energy_i)
         energy = scatter(energy_i, data[K.batch], dim=0, reduce="sum")

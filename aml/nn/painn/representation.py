@@ -5,6 +5,7 @@ import torch
 from aml.data import keys as K
 from aml.nn.cutoff import CosineCutoff
 from aml.nn.radial_basis import BesselRBF, GaussianRBF
+from aml.typing import DataDict
 
 from .interaction import PaiNNInteraction, PaiNNMixing
 
@@ -78,7 +79,7 @@ class PaiNNRepresentation(torch.nn.Module):
     def reset_parameters(self):
         torch.nn.init.xavier_uniform_(self.filter_net.weight.data)
 
-    def forward(self, data):
+    def forward(self, data: DataDict) -> DataDict:
         # get tensors from input dictionary
         z = data[K.elems]
         edge_index = data[K.edge_index]  # neighbors

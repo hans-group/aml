@@ -12,7 +12,6 @@ import torch
 import yaml
 
 from aml.data import keys as K
-from aml.data.data_structure import AtomsGraph
 from aml.typing import DataDict, Tensor
 
 
@@ -109,12 +108,13 @@ def remove_unused_kwargs(func, kwargs):
     return {k: v for k, v in kwargs.items() if k in valid_args}
 
 
-def compute_neighbor_vecs(data: AtomsGraph) -> AtomsGraph:
+def compute_neighbor_vecs(data: DataDict) -> DataDict:
     batch = data[K.batch]
     pos = data[K.pos]
     edge_index = data[K.edge_index]  # neighbors
     edge_shift = data[K.edge_shift]  # shift vectors
-    cell = data[K.cell] if "cell" in data else torch.zeros((batch.max() + 1, 3, 3)).to(pos.device)
+    batch_size = int((batch.max() + 1).item())
+    cell = data[K.cell] if "cell" in data else torch.zeros((batch_size, 3, 3)).to(pos.device)
     idx_i = edge_index[1]
     idx_j = edge_index[0]
 

@@ -3,6 +3,7 @@ import torch
 
 from aml.common.utils import canocialize_species
 from aml.data import keys as K
+from aml.typing import DataDict, Tensor
 
 
 class GlobalScaleShift(torch.nn.Module):
@@ -19,7 +20,7 @@ class GlobalScaleShift(torch.nn.Module):
         self.register_buffer("scale", torch.tensor(std, dtype=torch.float))
         self.register_buffer("shift", torch.tensor(mean, dtype=torch.float))
 
-    def forward(self, data, energy):
+    def forward(self, data: DataDict, energy: Tensor) -> Tensor:
         energy = energy * self.scale + self.shift * data[K.n_atoms]
         return energy
 
@@ -61,12 +62,12 @@ class PerSpeciesScaleShift(torch.nn.Module):
         return self._trainable
 
     @trainable.setter
-    def trainable(self, value):
+    def trainable(self, value: bool) -> None:
         self._trainable = value
-        self.scales.requires_grad = value
-        self.shifts.requires_grad = value
+        self.scales.requires_grad_(value)
+        self.shifts.requires_grad_(value)
 
-    def forward(self, data, atomic_energy):
+    def forward(self, data: DataDict, atomic_energy: Tensor) -> Tensor:
         species = data[K.elems]
         idx = self.elem_lookup[species]
         atomic_energy = atomic_energy * self.scales[idx] + self.shifts[idx]

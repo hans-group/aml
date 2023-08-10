@@ -90,7 +90,7 @@ class AtomTypeMapping(torch.nn.Module):
 
 
 @registry.register_energy_model("nequip")
-class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
+class NequIP(GraphModuleMixin, BaseEnergyModel):
     embedding_keys = [K.node_features, K.node_vec_features]
 
     def __init__(
@@ -155,7 +155,8 @@ class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
             layers = OrderedDict(layers)
         else:
             layers = OrderedDict((f"module{i}", m) for i, m in enumerate(module_list))
-        torch.nn.Sequential.__init__(self, layers)
+
+        self.layers = torch.nn.ModuleDict(layers)
         self.atom_type_mapping = AtomTypeMapping(species)
         self.species_energy_scale = PerSpeciesScaleShift(species)
 
@@ -220,9 +221,8 @@ class NequIP(GraphModuleMixin, BaseEnergyModel, torch.nn.Sequential):
 
     def forward(self, data: DataDict) -> Tensor:
         data = self.atom_type_mapping(data)
-        for module in self:
-            if module._get_name() not in ("GlobalScaleShift", "PerSpeciesScaleShift"):
-                data = module(data)
+        for module in self.layers.values():
+            data = module(data)
         energy_i = data[K.atomic_energy].squeeze(-1)
         energy_i = self.species_energy_scale(data, energy_i)
         # Compute system energy

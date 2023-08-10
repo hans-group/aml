@@ -3,11 +3,13 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 
+import torch
 import torch.nn
 
 from aml.common.registry import registry
 from aml.common.utils import compute_average_E0s, compute_force_rms_per_species, load_config
 from aml.nn.scale import PerSpeciesScaleShift
+from aml.typing import DataDict, Tensor
 
 
 @registry.register_energy_model("base")
@@ -19,7 +21,9 @@ class BaseEnergyModel(torch.nn.Module, ABC):
         self.species = species
         self.cutoff = cutoff
         self.species_energy_scale = PerSpeciesScaleShift(species)
+        self.embedding_keys = self.__class__.embedding_keys
 
+    @torch.jit.ignore
     def fit_energy_scale(
         self,
         dataset,
@@ -55,6 +59,7 @@ class BaseEnergyModel(torch.nn.Module, ABC):
 
         return energy_shifts, energy_scales
 
+    @torch.jit.ignore
     def initialize(
         self,
         dataset,
@@ -76,9 +81,10 @@ class BaseEnergyModel(torch.nn.Module, ABC):
         )
 
     @abstractmethod
-    def forward(self, data):
+    def forward(self, data: DataDict) -> Tensor:
         pass
 
+    @torch.jit.ignore
     def get_cutoff(self) -> float:
         return self.cutoff
 
@@ -110,6 +116,7 @@ class BaseEnergyModel(torch.nn.Module, ABC):
             model_class = cls
         return model_class(**config)
 
+    @torch.jit.unused
     @property
     def num_params(self):
         return sum(p.numel() for p in self.parameters())

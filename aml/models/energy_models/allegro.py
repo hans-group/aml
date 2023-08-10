@@ -12,13 +12,15 @@ from aml.nn.nequip.atomwise import AtomwiseReduce
 from aml.nn.nequip.edge_embedding import RadialBasisEdgeEncoding, SphericalHarmonicEdgeAttrs
 from aml.nn.nequip.one_hot_embedding import OneHotAtomEncoding
 from aml.nn.nequip.radial_basis import BesselBasis
-from aml.typing import DataDict
+from aml.typing import DataDict, Tensor
 
 from .base import BaseEnergyModel
 
 
 @registry.register_energy_model("allegro")
 class Allegro(BaseEnergyModel):
+    embedding_keys = [K.node_features]
+
     def __init__(
         self,
         # Model basics
@@ -178,7 +180,7 @@ class Allegro(BaseEnergyModel):
             irreps_in=self.layers["edge_eng_sum"].irreps_out,
         )
 
-    def forward(self, data: DataDict):
+    def forward(self, data: DataDict) -> Tensor:
         data = self.atom_type_mapping(data)
         for layer in self.layers.values():
             data = layer(data)
