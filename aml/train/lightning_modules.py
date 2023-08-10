@@ -1,8 +1,9 @@
 from copy import deepcopy
-from typing import Any, TypeAlias
+from typing import IO, Any, Self, TypeAlias
 
 import pytorch_lightning as pl
 import torch
+from lightning_fabric.utilities.types import _MAP_LOCATION_TYPE, _PATH
 from torch_geometric.data import Batch, Data
 from torch_geometric.utils import unbatch
 from tqdm import tqdm
@@ -170,6 +171,19 @@ class PotentialTrainingModule(pl.LightningModule):
         if not return_as_batch:
             return predictions
         return Batch.from_data_list(predictions)
+
+    @classmethod
+    def load_from_checkpoint(
+        cls,
+        checkpoint_path: _PATH | IO,
+        map_location: _MAP_LOCATION_TYPE = None,
+        hparams_file: _PATH | None = None,
+        strict: bool = True,
+        **kwargs: Any,
+    ) -> Self:
+        module = super().load_from_checkpoint(checkpoint_path, map_location, hparams_file, strict, **kwargs)
+        module._initialized = True
+        return module
 
 
 def unbatch_predictions(batch: Data, output: OutputDict) -> list[Data]:
