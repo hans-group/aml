@@ -44,6 +44,8 @@ class AMLCalculator(Calculator):  # noqa: F821
         self.model = model
         if device is not None:
             self.model = self.model.to(device)
+        else:
+            self.device = next(self.model.parameters()).device
         self.model.eval()
         self.compute_force = compute_force
         self.compute_stress = compute_stress
