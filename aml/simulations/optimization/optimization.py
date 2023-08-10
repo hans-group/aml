@@ -58,7 +58,7 @@ class GeometryOptimization(Simulation):
         self.model = self.atoms.calc.model
 
         device = self.model.parameters().__next__().device
-        self.data = AtomsGraph.from_ase(self.atoms, self.model.cutoff).to(device)
+        self.data = AtomsGraph.from_ase(self.atoms, self.model.cutoff).to(device).to_dict()
         self.data["pos"].requires_grad = True
         # Default values
         lr = optimizer_config.pop("lr", 1.0)

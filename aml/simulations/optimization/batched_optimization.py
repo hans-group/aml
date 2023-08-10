@@ -82,7 +82,7 @@ class BatchedGeometryOptimization(Simulation):
 
         def closure():
             self.optimizer.zero_grad()
-            energy = self.model(self.batch)["energy"]
+            energy = self.model(self.batch.to_dict())["energy"]
             energy_sum = energy.sum()
             energy_sum.backward()
             return energy_sum
@@ -100,7 +100,7 @@ class BatchedGeometryOptimization(Simulation):
 
     def step(self) -> bool:
         self.optimizer.step(self.closure)
-        output = self.model(self.batch)
+        output = self.model(self.batch.to_dict())
         self._energy = output["energy"].detach().cpu().numpy()
         self._fmax = get_max_force(output["force"].detach().cpu().numpy())
         self.scheduler.step(self._fmax)
@@ -111,7 +111,7 @@ class BatchedGeometryOptimization(Simulation):
         return self.converged
 
     def run(self, max_steps: int = 50) -> None:
-        initial_out = self.model(self.batch)
+        initial_out = self.model(self.batch.to_dict())
         self._energy = initial_out["energy"].detach().cpu().numpy()
         self._fmax = get_max_force(initial_out["force"].detach().cpu().numpy())
         with np.printoptions(precision=4, suppress=True):

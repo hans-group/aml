@@ -53,7 +53,7 @@ class AMLCalculator(Calculator):  # noqa: F821
         self.model.compute_force = compute_force
         self.model.compute_stress = compute_stress
         self.model.compute_hessian = compute_hessian
-        self.r_cut = model.energy_model.get_cutoff()
+        self.r_cut = model.energy_model.cutoff
 
         if neighborlist_backend not in ["ase", "matscipy"]:
             raise ValueError(f"Invalid neighborlist_backend: '{neighborlist_backend}'")
@@ -79,7 +79,7 @@ class AMLCalculator(Calculator):  # noqa: F821
         if self.compute_hessian:
             self.results["hessian"] = np.zeros((len(atoms) * 3, len(atoms) * 3))
 
-        data = AtomsGraph.from_ase(atoms, None).to(self.device).to_dict()
+        data = AtomsGraph.from_ase(atoms, None).to(self.device)
         if self.neighborlist_updater is None:
             self.neighborlist_updater = NeighborlistUpdater(
                 self.r_cut,
@@ -90,7 +90,7 @@ class AMLCalculator(Calculator):  # noqa: F821
             )
         self.neighborlist_updater.update(data, verbose=self.kwargs.get("verbose", False))
 
-        output = self.model(data)
+        output = self.model(data.to_dict())
         energy = output[K.energy].detach().cpu().numpy().squeeze()
         self.results.update(energy=energy, free_energy=energy)
         if self.compute_force:

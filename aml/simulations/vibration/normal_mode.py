@@ -1,9 +1,12 @@
 import math
 
 import numpy as np
+import torch
 from ase import Atoms, units
 from scipy import stats
 
+from aml.data import keys as K
+from aml.data.data_structure import AtomsGraph
 from aml.simulations.ase_interface import AMLCalculator
 
 # conversion factor from eV/Å^2/amu to eV^2
@@ -52,11 +55,27 @@ class NormalModes:
             raise RuntimeError("Atoms object has no calculator attached.")
         if not isinstance(self.atoms.calc, AMLCalculator):
             raise RuntimeError("AMLCalculator is required to calculate Hessian.")
-        model = self.atoms.calc.model
-        model.compute_hessian = True  # Temporarily enable hessian calculation
-        output = model.forward_atoms(self.atoms)
-        self.hessian = output["hessian"].detach().cpu().numpy().astype(np.float64)
-        model.compute_hessian = False  # Disable hessian calculation again
+        # Compute hessian
+        energy_model = self.atoms.calc.model.energy_model
+        data = AtomsGraph.from_ase(self.atoms, energy_model.cutoff).to(self.atoms.calc.device)
+        data["pos"].requires_grad = True
+        data.compute_edge_vecs()
+        energy = energy_model(data.to_dict())
+        engrad = torch.autograd.grad(
+            [energy],
+            [data["pos"]],
+            torch.ones_like(energy),
+            create_graph=True,
+            retain_graph=True,
+        )[0]
+        r = engrad.view(-1)
+        s = r.size(0)
+        hessian = energy.new_zeros((s, s))
+        for iatom in range(s):
+            tmp = torch.autograd.grad([r[iatom]], [data[K.pos]], retain_graph=iatom < s)[0]
+            if tmp is not None:
+                hessian[iatom] = tmp.view(-1)
+        self.hessian = hessian.detach().cpu().numpy().astype(np.float64)
 
     @staticmethod
     def freqs_to_evals(freqs):
