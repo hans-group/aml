@@ -79,7 +79,7 @@ class AMLCalculator(Calculator):  # noqa: F821
         if self.compute_hessian:
             self.results["hessian"] = np.zeros((len(atoms) * 3, len(atoms) * 3))
 
-        data = AtomsGraph.from_ase(atoms, None).to(self.device)
+        data = AtomsGraph.from_ase(atoms, None).to(self.device).to_dict()
         if self.neighborlist_updater is None:
             self.neighborlist_updater = NeighborlistUpdater(
                 self.r_cut,
