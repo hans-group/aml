@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import IO, Any, Self, TypeAlias
+from typing import IO, Any, TypeAlias
 
 import pytorch_lightning as pl
 import torch
@@ -180,7 +180,7 @@ class PotentialTrainingModule(pl.LightningModule):
         hparams_file: _PATH | None = None,
         strict: bool = True,
         **kwargs: Any,
-    ) -> Self:
+    ) -> "PotentialTrainingModule":
         module = super().load_from_checkpoint(checkpoint_path, map_location, hparams_file, strict, **kwargs)
         module._initialized = True
         return module
