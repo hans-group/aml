@@ -21,13 +21,17 @@ _ensemble_maps = {
     "npt_nosehoover": NPT,
 }
 
+_ensemble_default_params = {
+    "nvt_langevin": {"friction": 0.02},
+}
+
 
 class MolecularDynamics(Simulation):
     def __init__(
         self,
         atoms,
         timestep: float,  # fs
-        temperature: TemperatureStrategy | float,  # K
+        temperature: TemperatureStrategy | float = 300.0,  # K
         external_pressure: float = None,  # bar
         ensemble: str = "nvt_langevin",
         ensemble_params: dict = None,  # {"name": "...", ...},
@@ -46,7 +50,7 @@ class MolecularDynamics(Simulation):
             append_trajectory,
         )
         self.timestep = timestep
-        if isinstance(temperature, float):
+        if isinstance(temperature, (float, int)):
             temperature = ConstantTemperature(temperature)
         self.temperature = temperature
         self.initial_temperature = temperature.get_temperature(1)
@@ -75,6 +79,10 @@ class MolecularDynamics(Simulation):
             if kwargs["externalstress"] is not None:
                 kwargs["externalstress"] *= units.bar
         dyn_class = _ensemble_maps[self.ensemble]
+        default_kwargs = _ensemble_default_params.get(self.ensemble, {})
+        for key, val in default_kwargs.items():
+            if key not in kwargs:
+                kwargs[key] = val
         dyn = dyn_class(self.atoms, timestep=self.timestep * units.fs, **kwargs)
         return dyn
 
