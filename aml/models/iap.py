@@ -152,9 +152,7 @@ class InterAtomicPotential(BaseModel):
         if K.pos in self.require_grad_keys:
             data[K.pos].requires_grad_(True)
         compute_neighbor_vecs(data)
-        for key in self.require_grad_keys:
-            if key != K.pos:
-                data[key].requires_grad_(True)
+
         outputs = {}
         outputs[K.energy] = self.energy_model(data)
         grad_vals = self.compute_grad(data, outputs)

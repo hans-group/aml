@@ -4,6 +4,7 @@ import torch
 from e3nn import o3
 
 from aml.common.registry import registry
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.models.energy_models.nequip import AtomTypeMapping
 from aml.nn.allegro import Allegro_Module, EdgewiseEnergySum, NormalizedBasis, ScalarMLP
@@ -13,7 +14,6 @@ from aml.nn.nequip.edge_embedding import RadialBasisEdgeEncoding, SphericalHarmo
 from aml.nn.nequip.one_hot_embedding import OneHotAtomEncoding
 from aml.nn.nequip.radial_basis import BesselBasis
 from aml.typing import DataDict, Tensor
-
 from .base import BaseEnergyModel
 
 
@@ -181,6 +181,7 @@ class Allegro(BaseEnergyModel):
         )
 
     def forward(self, data: DataDict) -> Tensor:
+        compute_neighbor_vecs(data)
         data = self.atom_type_mapping(data)
         for layer in self.layers.values():
             data = layer(data)

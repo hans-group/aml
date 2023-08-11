@@ -14,7 +14,7 @@ from torch.nn import functional as F
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
-from aml.common.utils import compute_average_E0s
+from aml.common.utils import compute_average_E0s, compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.mace.blocks import (
     AtomicEnergiesBlock,
@@ -196,6 +196,7 @@ class MACE(BaseEnergyModel):
         self.global_energy_scale = GlobalScaleShift()
 
     def forward(self, data: DataDict) -> Tensor:
+        compute_neighbor_vecs(data)
         num_graphs = data[K.batch].max() + 1
         # Atomic energies
         elem_one_hot = F.one_hot(self.atomic_numbers_index_map[data[K.elems]], self.num_elements).to(

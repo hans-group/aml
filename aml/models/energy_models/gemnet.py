@@ -12,6 +12,7 @@ from torch_scatter import segment_coo, segment_csr
 from torch_sparse import SparseTensor
 
 from aml.common.registry import registry
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.gemnet.atom_update_block import OutputBlock
 from aml.nn.gemnet.base_layers import Dense
@@ -380,6 +381,7 @@ class GemNetT(BaseEnergyModel):
         return edge_index, cell_offsets, neighbors, edge_dist, edge_vector
 
     def generate_interaction_graph(self, data):
+        compute_neighbor_vecs(data)
         num_atoms = data[K.pos].size(0)
         edge_index = data[K.edge_index]
         distance_vec = data[K.edge_vec]

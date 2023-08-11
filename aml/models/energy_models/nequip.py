@@ -6,6 +6,7 @@ from e3nn import o3
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.nequip import (
     AtomwiseLinear,
@@ -220,6 +221,7 @@ class NequIP(GraphModuleMixin, BaseEnergyModel):
         return layers
 
     def forward(self, data: DataDict) -> Tensor:
+        compute_neighbor_vecs(data)
         data = self.atom_type_mapping(data)
         for module in self.layers.values():
             data = module(data)

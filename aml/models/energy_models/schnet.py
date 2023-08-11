@@ -1,6 +1,7 @@
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.mlp import MLP
 from aml.nn.schnet.representation import SchNetRepresentation
@@ -56,6 +57,7 @@ class SchNet(BaseEnergyModel):
         self.representation.reset_parameters()
 
     def forward(self, data: DataDict) -> Tensor:
+        compute_neighbor_vecs(data)
         data = self.representation(data)
         # Compute per-atom energy
         energy_i = self.energy_output(data[K.node_features]).squeeze(-1)
