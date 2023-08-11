@@ -6,7 +6,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
-from aml.common.utils import canocialize_species
+from aml.common.utils import canocialize_species, compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.bpnn import ACSF
 from aml.nn.bpnn.acsf import _default_acsf_params
@@ -59,6 +59,7 @@ class BPNN(BaseEnergyModel):
 
     def forward(self, data: DataDict) -> Tensor:
         """Compute ACSF and update the data dictionary."""
+        compute_neighbor_vecs(data)
         # Compute ACSF
         G = self.acsf(data)
         # Update the data dictionary
