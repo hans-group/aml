@@ -47,9 +47,9 @@ class AMLCalculator(Calculator):  # noqa: F821
         else:
             self.device = next(self.model.parameters()).device
         self.model.eval()
-        self.compute_force = compute_force
-        self.compute_stress = compute_stress
-        self.compute_hessian = compute_hessian
+        self._compute_force = compute_force
+        self._compute_stress = compute_stress
+        self._compute_hessian = compute_hessian
         self.model.compute_force = compute_force
         self.model.compute_stress = compute_stress
         self.model.compute_hessian = compute_hessian
@@ -62,6 +62,33 @@ class AMLCalculator(Calculator):  # noqa: F821
         self.neighborlist_skin = neighborlist_skin
         self.neighborlist_updater = None
         self.kwargs = kwargs
+
+    @property
+    def compute_force(self):
+        return self._compute_force
+
+    @compute_force.setter
+    def compute_force(self, value):
+        self._compute_force = value
+        self.model.compute_force = value
+
+    @property
+    def compute_stress(self):
+        return self._compute_stress
+
+    @compute_stress.setter
+    def compute_stress(self, value):
+        self._compute_stress = value
+        self.model.compute_stress = value
+
+    @property
+    def compute_hessian(self):
+        return self._compute_hessian
+
+    @compute_hessian.setter
+    def compute_hessian(self, value):
+        self._compute_hessian = value
+        self.model.compute_hessian = value
 
     def calculate(
         self,
