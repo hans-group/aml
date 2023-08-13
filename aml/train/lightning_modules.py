@@ -1,10 +1,10 @@
 from copy import deepcopy
-from typing import IO, Any, TypeAlias
+from typing import IO, Any, Literal, TypeAlias
 
 import pytorch_lightning as pl
 import torch
 from lightning_fabric.utilities.types import _MAP_LOCATION_TYPE, _PATH
-from torch_geometric.data import Batch, Data
+from torch_geometric.data import Batch, Data, InMemoryDataset
 from torch_geometric.utils import unbatch
 from tqdm import tqdm
 
@@ -43,10 +43,13 @@ class PotentialTrainingModule(pl.LightningModule):
         optimizer_config: Config | None = None,
         lr_scheduler: str | None = None,
         lr_scheduler_config: Config | None = None,
-        shift_by_avg_atomic_energy: bool = True,  # If True, shift energy by average atomic energy (or per_atom energy)
-        scale_by_force_rms: bool = True,  # If True, scale energy by force RMS (or energy std)
-        dataset_scale_stride: int | None = None,  # If not None, stride for dataset scaling
+        energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
+        energy_scale_mode: Literal["energy_mean", "force_rms"] = "force_rms",
+        energy_mean: Literal["auto"] | float | None = None,  # Must be per atom
+        atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
+        energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         trainable_scales: bool = True,
+        autoscale_dataset_stride: int | None = None,
     ):
         super().__init__()
         self.model, self.model_config = resolve_model(model)
@@ -59,10 +62,13 @@ class PotentialTrainingModule(pl.LightningModule):
         self.optimizer_config = optimizer_config or {}
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_config = lr_scheduler_config or {}
-        self.shift_by_avg_atomic_energy = shift_by_avg_atomic_energy
-        self.scale_by_force_rms = scale_by_force_rms
-        self.dataset_scale_stride = dataset_scale_stride
+        self.energy_shift_mode = energy_shift_mode
+        self.energy_scale_mode = energy_scale_mode
+        self.energy_mean = energy_mean
+        self.atomic_energies = atomic_energies
+        self.energy_scale = energy_scale
         self.trainable_scales = trainable_scales
+        self.autoscale_dataset_stride = autoscale_dataset_stride
 
         if "force" in self.loss_keys:
             self.model.compute_force = True
@@ -102,16 +108,18 @@ class PotentialTrainingModule(pl.LightningModule):
             }
         return config
 
-    def initialize(self, dataset):
+    def initialize(self, dataset: InMemoryDataset | None = None):
         energy_model = self.model.energy_model
         energy_model.initialize(
-            dataset, self.dataset_scale_stride, self.shift_by_avg_atomic_energy, self.scale_by_force_rms
+            self.energy_shift_mode,
+            self.energy_scale_mode,
+            self.energy_mean,
+            self.atomic_energies,
+            self.energy_scale,
+            self.trainable_scales,
+            dataset,
+            self.autoscale_dataset_stride,
         )
-        if hasattr(energy_model, "species_energy_scale"):
-            if self.trainable_scales:
-                energy_model.species_energy_scale.trainable = True
-            else:
-                energy_model.species_energy_scale.trainable = False
         self._initialized = True
 
     def forward(self, *args, **kwargs):

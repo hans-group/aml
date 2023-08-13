@@ -2,7 +2,7 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 from pprint import pprint
-from typing import Any
+from typing import Any, Literal
 
 import pytorch_lightning as pl
 import torch
@@ -29,10 +29,13 @@ class PotentialTrainer:
         val_size: float = 0.1,
         batch_size: int = 4,
         dataset_cache_dir: str | None = "data",
-        shift_by_avg_atomic_energy: bool = True,  # If True, shift energy by average atomic energy (or per_atom energy)
-        scale_by_force_rms: bool = True,  # If True, scale energy by force RMS (or energy std)
-        dataset_scale_stride: int | None = None,  # If not None, stride for dataset scaling
-        trainable_scales: bool = True,
+        energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
+        energy_scale_mode: Literal["energy_mean", "force_rms"] = "force_rms",
+        energy_mean: Literal["auto"] | float | None = None,  # Must be per atom
+        atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
+        energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
+        autoscale_dataset_stride: int | None = None,
+        trainable_cales: bool = True,
         # Hyperparameters for LightningModule
         train_force: bool = True,
         train_stress: bool = False,
@@ -71,6 +74,15 @@ class PotentialTrainer:
         self.val_size = val_size
         self.batch_size = batch_size
         self.dataset_cache_dir = Path(dataset_cache_dir) if dataset_cache_dir is not None else None
+
+        self.energy_shift_mode = energy_shift_mode
+        self.energy_scale_mode = energy_scale_mode
+        self.energy_mean = energy_mean
+        self.atomic_energies = atomic_energies
+        self.energy_scale = energy_scale
+        self.autoscale_dataset_stride = autoscale_dataset_stride
+        self.trainable_scales = trainable_cales
+
         self.train_force = train_force
         self.train_stress = train_stress
         self.loss_weights = loss_weights
@@ -83,10 +95,7 @@ class PotentialTrainer:
         self.optimizer_kwargs = optimizer_kwargs
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_kwargs = lr_scheduler_kwargs
-        self.shift_by_avg_atomic_energy = shift_by_avg_atomic_energy
-        self.scale_by_force_rms = scale_by_force_rms
-        self.dataset_scale_stride = dataset_scale_stride
-        self.trainable_scales = trainable_scales
+
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.max_epochs = max_epochs
@@ -286,10 +295,13 @@ class PotentialTrainer:
             optimizer_config=self.optimizer_config,
             lr_scheduler=self.lr_scheduler,
             lr_scheduler_config=self.lr_scheduler_config,
-            shift_by_avg_atomic_energy=self.shift_by_avg_atomic_energy,
-            scale_by_force_rms=self.scale_by_force_rms,
-            dataset_scale_stride=self.dataset_scale_stride,
+            energy_shift_mode=self.energy_shift_mode,
+            energy_scale_mode=self.energy_scale_mode,
+            energy_mean=self.energy_mean,
+            atomic_energies=self.atomic_energies,
+            energy_scale=self.energy_scale,
             trainable_scales=self.trainable_scales,
+            autoscale_dataset_stride=self.autoscale_dataset_stride,
         )
         self.training_module.initialize(self.datasets[0])
         train_loader, val_loader, _ = self._build_dataloaders()

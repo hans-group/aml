@@ -5,12 +5,15 @@
 ###########################################################################################
 
 
-from typing import List
+import warnings
+from typing import List, Literal
 
 import ase.data
+import numpy as np
 import torch
 from e3nn import o3
 from torch.nn import functional as F
+from torch_geometric.data import InMemoryDataset
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
@@ -239,25 +242,58 @@ class MACE(BaseEnergyModel):
 
     def initialize(
         self,
-        dataset,
-        stride: int | None = None,
-        use_avg_atomic_energy: bool = None,
-        use_force_rms: bool = True,
+        energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
+        energy_scale_mode: Literal["energy_std", "force_rms"] = "force_rms",
+        energy_mean: float | Literal["auto"] | None = None,
+        atomic_energies: dict[str, float] | Literal["auto"] | None = "auto",
+        energy_scale: float | dict[str, float] | Literal["auto"] | None = "auto",
+        trainable_scales: bool = True,
+        dataset: InMemoryDataset | None = None,
+        dataset_stride: int | None = None,
     ):
-        del use_avg_atomic_energy
-        if stride is not None:
-            dataset = dataset[::stride]
-        if use_force_rms:
-            if "force" not in dataset._data:
-                raise ValueError("Dataset does not contain forces")
-            forces = dataset._data.force
-            force_rms = torch.sqrt(torch.mean(torch.sum(forces**2, dim=-1)))
-            self.global_energy_scale.scale.data = force_rms
+        _no_dataset_msg = (
+            "Dataset must be provided when initializing the model "
+            "if atomic_energies or energy_scale is set to 'auto'."
+        )
+
+        if energy_shift_mode != "atomic_energies":
+            raise ValueError("For MACE models, energy_shift_mode must be 'atomic_energies'")
+
+        if energy_mean is not None:
+            warnings.warn("energy_mean is ignored for MACE models", stacklevel=1)
+
+        # Atomic energies to shift
+        if atomic_energies == "auto":
+            if dataset is None:
+                raise ValueError(_no_dataset_msg)
+            atomic_energies = compute_average_E0s(dataset, stride=dataset_stride)
+        elif atomic_energies is None:
+            atomic_energies = {s: 0.0 for s in self.species}
+        elif isinstance(atomic_energies, dict):
+            if set(self.species) != set(atomic_energies.keys()):
+                raise ValueError("Keys of the dictionary must match the species.")
+            atomic_energies = atomic_energies
         else:
-            all_energies = dataset._data.energy
-            energy_std = all_energies.std()
-            self.global_energy_scale.scale.data = energy_std
-        atomic_energies_dict = compute_average_E0s(dataset, stride)
-        atomic_energies = torch.as_tensor([atomic_energies_dict[s] for s in self.species], dtype=torch.float)
-        self.atomic_energies_fn.atomic_energies.data = atomic_energies
-        self._atomic_energies.data = atomic_energies
+            raise ValueError("Invalid value is given for atomic_energies. Must be 'auto', dictionart, or None.")
+
+        # Energy scale to multiply
+        if energy_scale == "auto":
+            if dataset is None:
+                raise ValueError(_no_dataset_msg)
+            if energy_scale_mode == "energy_std":
+                energy_scale = dataset._data.energy.std().item()
+            elif energy_scale_mode == "force_rms":
+                energy_scale = dataset._data.force.norm(dim=-1).std().item()
+            else:
+                raise ValueError("Invalid value is given for energy_scale_mode. Must be 'energy_std' or 'force_rms'.")
+        elif energy_scale is None:
+            energy_scale = 1.0
+        elif isinstance(energy_scale, (float, int, np.ndarray, torch.Tensor)):
+            energy_scale = energy_scale
+        else:
+            raise ValueError("Invalid value is given for energy_scale. Must be 'auto', float, or None.")
+
+        # Set values
+        _atomic_energies = torch.as_tensor([atomic_energies[s] for s in self.species], dtype=torch.float)
+        self.atomic_energies_fn.atomic_energies.data = _atomic_energies
+        self.global_energy_scale.scale.data = torch.as_tensor(energy_scale, dtype=torch.float)

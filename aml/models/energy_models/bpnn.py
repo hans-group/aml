@@ -1,7 +1,8 @@
 import itertools
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 import torch
+from torch_geometric.data import InMemoryDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import scatter
 
@@ -78,8 +79,25 @@ class BPNN(BaseEnergyModel):
         return energy
 
     def initialize(
-        self, dataset, stride: int | None = None, use_avg_atomic_energy: bool = True, use_force_rms: bool = True
+        self,
+        energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
+        energy_scale_mode: Literal["energy_mean", "force_rms"] = "force_rms",
+        energy_mean: float | Literal["auto"] | None = None,
+        atomic_energies: dict[str, float] | Literal["auto"] | None = "auto",
+        energy_scale: float | dict[str, float] | Literal["auto"] | None = "auto",
+        trainable_scales: bool = True,
+        dataset: InMemoryDataset | None = None,
+        dataset_stride: int | None = None,
     ):
-        super().initialize(dataset, stride, use_avg_atomic_energy, use_force_rms)
+        super().initialize(
+            energy_shift_mode,
+            energy_scale_mode,
+            energy_mean,
+            atomic_energies,
+            energy_scale,
+            trainable_scales,
+            dataset,
+            dataset_stride,
+        )
         dataloader = DataLoader(dataset, batch_size=4, shuffle=False)
         self.acsf.fit_scales(dataloader)

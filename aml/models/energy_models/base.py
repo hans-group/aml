@@ -2,9 +2,12 @@ import inspect
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from typing import Literal
 
+import numpy as np
 import torch
 import torch.nn
+from torch_geometric.data import InMemoryDataset
 
 from aml.common.registry import registry
 from aml.common.utils import compute_average_E0s, compute_force_rms_per_species, load_config
@@ -62,10 +65,14 @@ class BaseEnergyModel(torch.nn.Module, ABC):
     @torch.jit.ignore
     def initialize(
         self,
-        dataset,
-        stride: int | None = None,
-        use_avg_atomic_energy: bool = True,
-        use_force_rms: bool = True,
+        energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
+        energy_scale_mode: Literal["energy_std", "force_rms"] = "force_rms",
+        energy_mean: Literal["auto"] | float | None = None,  # Must be per atom
+        atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
+        energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
+        trainable_scales: bool = True,
+        dataset: InMemoryDataset | None = None,
+        dataset_stride: int | None = None,
     ):
         """Initialize the model.
         This typically means setting up the energy scales.
@@ -75,9 +82,71 @@ class BaseEnergyModel(torch.nn.Module, ABC):
         Args:
             dataset (_type_): Dataset to initialize the model with.
         """
-        energy_shifts, energy_scales = self.fit_energy_scale(dataset, stride, use_avg_atomic_energy, use_force_rms)
+
+        def _check_dict_species(d):
+            if set(self.species) != set(d.keys()):
+                raise ValueError("Keys of the dictionary must match the species.")
+
+        _no_dataset_msg = (
+            "Dataset must be provided when initializing the model "
+            "if atomic_energies or energy_scale is set to 'auto'."
+        )
+        # Energy shift
+        if energy_shift_mode == "mean":
+            # Energy mean to shift
+            if energy_mean == "auto":
+                if dataset is None:
+                    raise ValueError(_no_dataset_msg)
+                _mean_val = (dataset._data.energy / dataset._data.n_atoms).mean().item()
+            elif energy_mean is None:
+                _mean_val = 0.0
+            elif isinstance(energy_mean, (float, int, np.ndarray, torch.Tensor)):
+                _mean_val = float(energy_mean)
+            else:
+                raise ValueError("Invalid value is given for energy_mean. Must be 'auto', float, or None.")
+            per_species_energy_shifts = {s: _mean_val for s in self.species}
+
+        elif energy_shift_mode == "atomic_energies":
+            # Atomic energies to shift
+            if atomic_energies == "auto":
+                if dataset is None:
+                    raise ValueError(_no_dataset_msg)
+                atomic_energies = compute_average_E0s(dataset, stride=dataset_stride)
+            elif atomic_energies is None:
+                atomic_energies = {s: 0.0 for s in self.species}
+            elif isinstance(atomic_energies, dict):
+                _check_dict_species(atomic_energies)
+                atomic_energies = atomic_energies
+            else:
+                raise ValueError("Invalid value is given for atomic_energies. Must be 'auto', dictionart, or None.")
+            per_species_energy_shifts = atomic_energies
+
+        # Energy scale to multiply
+        if energy_scale == "auto":
+            if dataset is None:
+                raise ValueError(_no_dataset_msg)
+            if energy_scale_mode == "energy_std":
+                _scale_val = dataset._data.energy.std().item()
+                per_species_energy_scales = {s: _scale_val for s in self.species}
+            elif energy_scale_mode == "force_rms":
+                per_species_energy_scales = compute_force_rms_per_species(dataset, stride=dataset_stride)
+            else:
+                raise ValueError("Invalid value is given for energy_scale_mode. Must be 'energy_std' or 'force_rms'.")
+        elif energy_scale is None:
+            per_species_energy_scales = {s: 1.0 for s in self.species}
+        elif isinstance(energy_scale, (float, int, np.ndarray, torch.Tensor)):
+            per_species_energy_scales = {s: float(energy_scale) for s in self.species}
+        elif isinstance(energy_scale, dict):
+            _check_dict_species(energy_scale)
+            per_species_energy_scales = energy_scale
+        else:
+            raise ValueError("Invalid value is given for energy_scale. Must be 'auto', float, dict, or None.")
+
         self.species_energy_scale = PerSpeciesScaleShift(
-            self.species, initial_scales=energy_scales, initial_shifts=energy_shifts
+            self.species,
+            initial_scales=per_species_energy_scales,
+            initial_shifts=per_species_energy_shifts,
+            trainable=trainable_scales,
         )
 
     @abstractmethod

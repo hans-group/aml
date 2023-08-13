@@ -14,6 +14,7 @@ from aml.nn.nequip.edge_embedding import RadialBasisEdgeEncoding, SphericalHarmo
 from aml.nn.nequip.one_hot_embedding import OneHotAtomEncoding
 from aml.nn.nequip.radial_basis import BesselBasis
 from aml.typing import DataDict, Tensor
+
 from .base import BaseEnergyModel
 
 
