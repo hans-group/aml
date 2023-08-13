@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple, Union
 
@@ -58,7 +59,13 @@ class ASEDataset(InMemoryDataset):
         self.neighborlist_cutoff = neighborlist_cutoff
         self.neighborlist_backend = neighborlist_backend
         self.progress_bar = progress_bar
-        self.atomref_energies = atomref_energies
+        if atomref_energies is not None:
+            warnings.warn(
+                "atomref_energies is deprecated and the values will be ignored",
+                DeprecationWarning,
+                stacklevel=1,
+            )
+        self.atomref_energies = None
 
         # sanity check
         if len(self.index) == 1:
