@@ -31,10 +31,6 @@ test_dataset: # Optional
 val_size: 0.1                           # Fraction of train dataset to be used as validation dataset
 batch_size: 4                           # Batch size
 dataset_cache_dir: "data"               # If not null, processed dataset will be cached.
-shift_by_avg_atomic_energy: true        # Shift energies by average atomic energies per species
-scale_by_force_rms: true                # Scale energies by RMS of force
-dataset_scale_stride: null              # Set this to positive integer when dataset is large (>50000)
-trainable_scales: true
 
 # Hyperparameters for training
 ## Global config
