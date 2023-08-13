@@ -96,9 +96,9 @@ def compute_force_rms_per_species(dataset, stride=None) -> dict[int, float]:
     species = torch.unique(dataset._data.elems)
     force_rms = {}
     for elem in species:
-        force_elem = dataset._data.force[dataset._data.elems == elem]
+        force_elem: Tensor = dataset._data.force[dataset._data.elems == elem]
         symbol = ase.data.chemical_symbols[elem.item()]
-        force_rms[symbol] = torch.sqrt(torch.mean(torch.sum(force_elem**2, dim=-1)))
+        force_rms[symbol] = force_elem.square().mean().sqrt().item()
     return force_rms
 
 
