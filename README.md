@@ -13,6 +13,7 @@ Python package for atomistic machine learning. Currently focuses on interatomic 
 
 - Install pytorch, pytorch_geometric & pytorch_lightning
   - Also pytorch_scatter and pytorch_sparse is required
+  - Follow the official docs: [[PyTorch]](https://pytorch.org/get-started/locally/) [[PyTorch Geometric]](https://pytorch-geometric.readthedocs.io/en/2.3.1/install/installation.html)
 - Clone this repo (git clone ...)
 - Run `pip install .`
 
