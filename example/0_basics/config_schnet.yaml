@@ -17,13 +17,13 @@ model:
 
 # Config for dataset
 train_dataset:
-  data_source: "../data/water_train.traj"        # Any ASE-readable format
+  data_source: "../data/water_train.xyz"        # Any ASE-readable format
   index: ":"                                     # Indices to read (query params are OK for ase DB format)
   neighborlist_cutoff: *cutoff                   # Cutoff for neighborlist.
   neighborlist_backend: &nbr_backend "matscipy"  # Backend for computing neighborlist. Use "ase" for small cells (< 2 * cutoff). Otherwise "matscipy" is much more fast
 
 test_dataset: # Optional
-  data_source: "../data/water_test.traj"        # Any ASE-readable format
+  data_source: "../data/water_test.xyz"        # Any ASE-readable format
   index: ":"                                    # Indices to read (query params are OK for ase DB format)
   neighborlist_cutoff: *cutoff                  # Cutoff for neighborlist.
   neighborlist_backend: *nbr_backend
@@ -31,6 +31,13 @@ test_dataset: # Optional
 val_size: 0.1                           # Fraction of train dataset to be used as validation dataset
 batch_size: 4                           # Batch size
 dataset_cache_dir: "data"               # If not null, processed dataset will be cached.
+energy_shift_mode: atomic_energies
+energy_scale_mode: force_rms
+energy_mean: null  # Must be per atom
+atomic_energies: auto
+energy_scale: auto
+autoscale_dataset_stride: null
+trainable_cales: true
 
 # Hyperparameters for training
 ## Global config
