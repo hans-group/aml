@@ -1,5 +1,5 @@
 from . import common, data, models, nn, simulations, train, typing
-from .api import load_iap
+from .api import compile_iap, load_iap
 
 __all__ = [
     "simulations",
@@ -9,6 +9,7 @@ __all__ = [
     "models",
     "typing",
     "train",
+    "compile_iap",
     "load_iap",
 ]
 
