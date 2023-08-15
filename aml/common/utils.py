@@ -7,9 +7,7 @@ from pathlib import Path
 
 import ase.data
 import numpy as np
-import tomli
 import torch
-import yaml
 
 from aml.data import keys as K
 from aml.typing import DataDict, Tensor
@@ -153,9 +151,17 @@ def load_config(filepath: PathLike) -> dict:
         with open(filepath, "r") as f:
             config = json.load(f)
     elif filepath.suffix == ".yaml":
+        try:
+            import yaml
+        except ImportError as e:
+            raise ImportError("Please install pyyaml to load yaml config files.") from e
         with open(filepath, "r") as f:
             config = yaml.safe_load(f)
     elif filepath.suffix == ".toml":
+        try:
+            import tomli
+        except ImportError as e:
+            raise ImportError("Please install tomli to load toml config files.") from e
         with open(filepath, "rb") as f:
             config = tomli.load(f)
     else:
