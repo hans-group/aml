@@ -35,7 +35,7 @@ class PotentialTrainer:
         atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
         energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         autoscale_dataset_stride: int | None = None,
-        trainable_cales: bool = True,
+        trainable_scales: bool = True,
         # Hyperparameters for LightningModule
         train_force: bool = True,
         train_stress: bool = False,
@@ -81,7 +81,7 @@ class PotentialTrainer:
         self.atomic_energies = atomic_energies
         self.energy_scale = energy_scale
         self.autoscale_dataset_stride = autoscale_dataset_stride
-        self.trainable_scales = trainable_cales
+        self.trainable_scales = trainable_scales
 
         self.train_force = train_force
         self.train_stress = train_stress
