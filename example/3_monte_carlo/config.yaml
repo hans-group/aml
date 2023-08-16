@@ -1,0 +1,92 @@
+# Config for model
+model: 
+  energy_model: 
+      "@name": "painn"                        # Name of the model.
+      species: [Pt, O, X]                 # Species to consider.
+      cutoff: &cutoff 6.0                      # Cutoff radius for neighbor list
+      hidden_channels: 128        # Number of channels in hidden layers
+      n_interactions: 3          # Number of interaction blocks
+      rbf_type: "gaussian"         # Type of radial basis function for edge expansion. "gaussian" or "bessel"
+      n_rbf: 50                   # Number of rbf values. Do not use more than 20 for bessel rbf.
+      trainable_rbf: true       # Trainable RBF layer or not
+      activation: "silu"         # Activation function
+      shared_interactions: true # Share the parameters through interaction blocks
+      shared_filters: true      # Share the filters thrhough convolutions
+      epsilon: 1.0e-8              # Small number for stability
+  compute_force: false
+  compute_stress: false
+  compute_hessian: false
+  
+# Config for dataset
+train_dataset:
+  data_source: "../data/Pt111_O_ads.db"        # Any ASE-readable format
+  index: ":"                         # Indices to read (query params are OK for ase DB format)
+  neighborlist_cutoff: *cutoff                 # Cutoff for neighborlist.
+  neighborlist_backend: &nbr_backend "ase"     # Backend for computing neighborlist. Use "ase" for small cells (< 2 * cutoff). Otherwise "matscipy" is much more fast
+
+val_size: 0.10                                  # Fraction of train dataset to be used as validation dataset
+batch_size: 4                            # Batch size
+dataset_cache_dir: data                    # If not null, processed dataset will be cached.
+energy_shift_mode: atomic_energies
+energy_scale_mode: energy_std
+energy_mean: 0.0  # Must be per atom
+atomic_energies:
+  Pt: -6.554831008333333 # theta = 0 ML
+  O: -7.413948731666667 # theta = 1 ML
+  X: 0.0000000
+energy_scale: auto
+autoscale_dataset_stride: null
+trainable_scales: false
+
+# Hyperparameters for training
+## Global config
+project_name: myproject                 # Name of the project
+experiment_name: PtO                      # Name of the experiment
+train_force: false                              # Whether to train force or not
+train_stress: False                            # Whether to train stress or not. Only available for periodic system
+max_epochs: 1500                          # Maximum number of epochs
+device: "cuda"                                 # Device to use. 'cpu' or 'cuda'
+restart_from_checkpoint: null                  # if set as ckpt path, restart training from it
+## Logging
+logger: false                         # Logger to use. tensorboard or wandb available
+log_every_n_steps: 50                          # Logging frequency
+checkpoint_monitor: "val_loss"                 # Monitor metric for checkpointing best model
+checkpoint_mode: "min"                         
+checkpoint_save_last: True                     # Whether save last model or not
+
+## Loss and metrics
+loss_weights:                                  # Weights of individual loss per property
+  energy: 1.00
+  # force: 1.00
+  # stress: 1.0
+loss_type: "mse_loss"                          # Type of loss function. "mse_loss" or "huber_loss"
+per_atom_energy_loss: true                     # If true, energy loss will be computed with per-atom energy
+metrics:                                       # Metrics to log
+  - "energy_mae"
+  - "per_atom_energy_mae"
+  # - "force_mae"
+  # - "stress_mae"
+  - "energy_rmse"
+  - "per_atom_energy_rmse"
+  # - "force_rmse"
+  # - "stress_rmse"
+
+# Optimization
+optimizer: "adam"                              # Optimizer name. See `torch.optim` for all optimizers
+lr: 0.001                                     # Learning rate.
+weight_decay: 0.0                              # Weight decay
+optimizer_kwargs:                              # Optimizer-specific parameters
+  amsgrad: false                               
+lr_scheduler: reduce_lr_on_plateau             # Learning rate scheduler. See `torch` for details
+lr_scheduler_kwargs:                           # Scheduler-specific parameters
+  patience: 25                                 # Reduce lr when val_loss does not improve with certain steps
+  factor: 0.9                                  # Reduce lr by this factor
+  mode: "min"                                  # Improvement means minimization of val_loss
+  min_lr: 1.0e-6                               # Minimum lr
+early_stopping: True                           # Use early stopping
+early_stopping_monitor: "lr"                   # Monitor metric for early stopping
+early_stopping_mode: "min"
+early_stopping_patience: 100000000000
+early_stopping_threshold: 1.0e-6
+gradient_clip_val: 5.0                         # Clip gradients when training
+ema_decay: 0.99                               # Decay weight for smooth improvement of loss using expotential moving average (EMA)
