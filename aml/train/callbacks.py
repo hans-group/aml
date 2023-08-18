@@ -1,5 +1,5 @@
-import pytorch_lightning as pl
-from pytorch_lightning import callbacks
+import lightning as L
+from lightning.pytorch import callbacks
 from torch_ema import ExponentialMovingAverage as EMA
 
 from aml.common.registry import registry
@@ -23,13 +23,13 @@ class ExponentialMovingAverage(callbacks.Callback):
         self.ema.store()
         self.ema.copy_to()
 
-    def on_train_epoch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_epoch_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         self.ema.restore()
 
     def on_train_batch_end(self, trainer, pl_module, *args, **kwargs):
         self.ema.update()
 
-    def on_validation_epoch_start(self, trainer: "pl.Trainer", pl_module, *args, **kwargs):
+    def on_validation_epoch_start(self, trainer: "L.Trainer", pl_module, *args, **kwargs):
         self.ema.store()
         self.ema.copy_to()
 

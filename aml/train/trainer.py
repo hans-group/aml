@@ -4,10 +4,10 @@ from pathlib import Path
 from pprint import pprint
 from typing import Any, Literal
 
-import pytorch_lightning as pl
+import lightning as L
 import torch
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
+from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
 from torch_geometric.loader import DataLoader
 
 from aml.data.dataset import ASEDataset
@@ -213,7 +213,7 @@ class PotentialTrainer:
             test_loader = None
         return train_loader, val_loader, test_loader
 
-    def _build_callbacks(self) -> list[pl.Callback]:
+    def _build_callbacks(self) -> list[L.Callback]:
         callbacks = [
             RichProgressBar(leave=True),
         ]
@@ -310,7 +310,7 @@ class PotentialTrainer:
             if not Path(ckpt_path).exists():
                 print("Checkpoint does not exist. Ignoring.")
                 ckpt_path = None
-        self.trainer = pl.Trainer(
+        self.trainer = L.Trainer(
             accelerator=self.device,
             devices=1,  # TODO: Add support for multiple GPUs
             gradient_clip_val=self.gradient_clip_val,

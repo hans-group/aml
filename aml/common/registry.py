@@ -118,8 +118,8 @@ def _find_all_torch_initilizers():
 
 
 def _find_all_pl_callbacks():
-    from pytorch_lightning import callbacks
-    from pytorch_lightning.callbacks import Callback
+    from lightning.pytorch import callbacks
+    from lightning.pytorch.callbacks import Callback
 
     all_vars = vars(callbacks)
     all_callbacks = {
@@ -132,9 +132,9 @@ def _find_all_pl_callbacks():
 
 
 def _find_all_pl_loggers():
-    from pytorch_lightning import loggers
-    from pytorch_lightning.loggers import Logger
-    from pytorch_lightning.loggers.wandb import WandbLogger
+    from lightning.pytorch import loggers
+    from lightning.pytorch.loggers import Logger
+    from lightning.pytorch.loggers.wandb import WandbLogger
 
     all_vars = vars(loggers)
     all_loggers = {

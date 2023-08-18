@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import IO, Any, Literal, TypeAlias
 
-import pytorch_lightning as pl
+import lightning as L
 import torch
 from lightning_fabric.utilities.types import _MAP_LOCATION_TYPE, _PATH
 from torch_geometric.data import Batch, Data, InMemoryDataset
@@ -30,7 +30,7 @@ def resolve_model(model: InterAtomicPotential | Config) -> tuple[InterAtomicPote
     return model, model_spec
 
 
-class PotentialTrainingModule(pl.LightningModule):
+class PotentialTrainingModule(L.LightningModule):
     def __init__(
         self,
         model: InterAtomicPotential | dict[str, Any],
