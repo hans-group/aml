@@ -1,9 +1,28 @@
 from pathlib import Path
 
 import torch
+import yaml
 from e3nn.util.jit import script as e3nn_script
 
 from aml.models.iap import InterAtomicPotential
+
+CONFIG_PATH = Path.home() / ".config/aml"
+
+
+def load_pretrained_model(name: str) -> torch.nn.Module | torch.jit.ScriptModule:
+    config_path = CONFIG_PATH / "models.yaml"
+    if not config_path.exists():
+        raise RuntimeError(f"Could not find config file at {config_path}.")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    model_path = CONFIG_PATH / config[name]["path"]
+    if not model_path.exists():
+        raise RuntimeError(f"Could not find model {name} at {model_path}.")
+    if config[name]["type"] == "iap":
+        model = load_iap(model_path)
+    else:
+        raise RuntimeError(f"Model type {config[name]['type']} not supported.")
+    return model
 
 
 def load_iap(path: str | Path) -> torch.nn.Module | torch.jit.ScriptModule:
