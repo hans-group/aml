@@ -197,8 +197,9 @@ class InterAtomicPotential(BaseModel):
 
     @classmethod
     def load(cls, path: str) -> "InterAtomicPotential":
+        map_location = None if torch.cuda.is_available() else "cpu"
         if str(path).endswith(".ckpt"):
-            ckpt = torch.load(path)
+            ckpt = torch.load(path, map_location=map_location)
             hparams = ckpt["hyper_parameters"]
             model_config = hparams["model"]
             state_dict = ckpt["state_dict"]

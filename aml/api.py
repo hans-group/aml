@@ -26,11 +26,12 @@ def load_pretrained_model(name: str) -> torch.nn.Module | torch.jit.ScriptModule
 
 
 def load_iap(path: str | Path) -> torch.nn.Module | torch.jit.ScriptModule:
+    map_location = None if torch.cuda.is_available() else "cpu"
     if str(path).endswith(".ckpt"):
         return InterAtomicPotential.load(path)
     else:
         try:
-            return torch.jit.load(path)
+            return torch.jit.load(path, map_location=map_location)
         except RuntimeError as err:
             raise RuntimeError(
                 "Could not load model. Please make sure that the model was saved with torch.jit.save(model, path)"
