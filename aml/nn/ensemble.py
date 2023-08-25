@@ -1,8 +1,7 @@
 import torch
 
+from aml.models.base import BaseModel
 from aml.typing import DataDict, OutputDict
-
-from .base import BaseModel
 
 
 class EnsembleModel(BaseModel):
