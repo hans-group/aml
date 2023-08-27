@@ -35,15 +35,16 @@ class ASEFileReader(IterDataPipe):
 class AtomsGraphParser(IterDataPipe):
     default_float_dtype = torch.get_default_dtype()
 
-    def __init__(self, dp):
+    def __init__(self, dp, read_properties=True):
         self.dp = dp
+        self.read_properties = read_properties
 
     def __iter__(self):
         for atoms in self.dp:
             if not isinstance(atoms, ase.Atoms):
                 raise TypeError("Input datapipe must yield ase.Atoms, but got {}".format(type(atoms)))
             # do something with atoms
-            yield AtomsGraph.from_ase(atoms)
+            yield AtomsGraph.from_ase(atoms, read_properties=self.read_properties)
 
 
 @functional_datapipe("build_neighbor_list")
