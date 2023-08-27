@@ -1,6 +1,6 @@
+from copy import deepcopy
 from typing import Literal
 
-import numpy as np
 from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
@@ -41,7 +41,7 @@ class AMLCalculator(Calculator):  # noqa: F821
     ):
         super().__init__(**kwargs)
         self.device = device
-        self.model = model
+        self.model = deepcopy(model)
         if device is not None:
             self.model = self.model.to(device)
         else:
@@ -99,14 +99,8 @@ class AMLCalculator(Calculator):  # noqa: F821
         properties = properties or ["energy"]
         system_changes = system_changes or all_changes
         super().calculate(atoms, properties, system_changes)
-        self.results["energy"] = 0.0
-        self.results["free_energy"] = 0.0
-        self.results["forces"] = np.zeros((len(atoms), 3))
-        self.results["stress"] = np.zeros(6)
-        if self.compute_hessian:
-            self.results["hessian"] = np.zeros((len(atoms) * 3, len(atoms) * 3))
 
-        data = AtomsGraph.from_ase(atoms, None).to(self.device)
+        data = AtomsGraph.from_ase(atoms, None, read_properties=False).to(self.device)
         if self.neighborlist_updater is None:
             self.neighborlist_updater = NeighborlistUpdater(
                 self.r_cut,
@@ -118,12 +112,19 @@ class AMLCalculator(Calculator):  # noqa: F821
         self.neighborlist_updater.update(data, verbose=self.kwargs.get("verbose", False))
 
         output = self.model(data.to_dict())
-        energy = output[K.energy].detach().cpu().numpy().squeeze()
-        self.results.update(energy=energy, free_energy=energy)
-        if self.compute_force:
+        energy = output[K.energy].detach().cpu().item()
+        if "energy" in properties:
+            self.results.update(energy=energy, free_energy=energy)
+        if "forces" in properties:
+            if not self.compute_force:
+                raise RuntimeError("Force calculation is not enabled.")
             self.results.update(forces=output[K.force].detach().cpu().numpy())
-        if self.compute_stress:
+        if "stress" in properties:
+            if not self.compute_stress:
+                raise RuntimeError("Stress calculation is not enabled.")
             s = output[K.stress].detach().cpu().numpy().squeeze()
             self.results.update(stress=full_3x3_to_voigt_6_stress(s))
-        if self.compute_hessian:
+        if "hessian" in properties:
+            if not self.compute_hessian:
+                raise RuntimeError("Hessian calculation is not enabled.")
             self.results.update(hessian=output[K.hessian].detach().cpu().numpy())
