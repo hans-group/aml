@@ -2,7 +2,7 @@ from abc import abstractmethod
 
 import numpy as np
 from ase import Atoms
-from ase.neighborlist import neighbor_list
+from ase_extension.neighborlist import neighbor_list
 
 from .utils import find_fixatoms_constraint
 
@@ -69,6 +69,8 @@ class NeighborSwap(RandomMove):
         if len(movable_idx) == 0:
             raise RuntimeError("No move available")
         neigh_i, neigh_j = neighbor_list("ij", atoms, cutoff=self.cutoff, self_interaction=False)
+        neigh_i = neigh_i.astype(np.int64)
+        neigh_j = neigh_j.astype(np.int64)
         idx_i = np.random.choice(movable_idx)
         neigh_ij = neigh_j[neigh_i == idx_i]
 
