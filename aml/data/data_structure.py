@@ -89,6 +89,7 @@ class AtomsGraph(Data):
         force: Tensor = None,
         stress: Tensor = None,
         *,
+        read_properties: bool = True,
         add_batch: bool = True,
         neighborlist_backend: Union[str, NeighborListBuilder] = "ase",
         **kwargs,
@@ -117,29 +118,29 @@ class AtomsGraph(Data):
         pos = torch.tensor(atoms.positions, dtype=_default_dtype)
         cell = cls.resolve_cell(atoms)
         n_atoms = torch.tensor([len(atoms)], dtype=torch.long)
-
-        if energy is None:
-            try:
-                energy = atoms.get_potential_energy()
-                energy = torch.as_tensor(energy, dtype=_default_dtype)
-            except RuntimeError:
-                pass
-        if force is None:
-            try:
-                force = atoms.get_forces()
-                force = torch.as_tensor(force, dtype=_default_dtype)
-            except RuntimeError:
-                pass
-        if stress is None:
-            try:
-                stress = atoms.get_stress(voigt=False)
-                stress = torch.as_tensor(np.array([stress]), dtype=_default_dtype)
-            except RuntimeError:
-                pass
-        else:
-            if stress.shape == (6,):
-                stress = voigt_6_to_full_3x3_stress(stress)
-            stress = torch.as_tensor(stress, dtype=_default_dtype)
+        if read_properties:
+            if energy is None:
+                try:
+                    energy = atoms.get_potential_energy()
+                    energy = torch.as_tensor(energy, dtype=_default_dtype)
+                except RuntimeError:
+                    pass
+            if force is None:
+                try:
+                    force = atoms.get_forces()
+                    force = torch.as_tensor(force, dtype=_default_dtype)
+                except RuntimeError:
+                    pass
+            if stress is None:
+                try:
+                    stress = atoms.get_stress(voigt=False)
+                    stress = torch.as_tensor(np.array([stress]), dtype=_default_dtype)
+                except RuntimeError:
+                    pass
+            else:
+                if stress.shape == (6,):
+                    stress = voigt_6_to_full_3x3_stress(stress)
+                stress = torch.as_tensor(stress, dtype=_default_dtype)
         atoms_graph = cls(
             elems, pos, cell, None, None, energy, force, stress, n_atoms=n_atoms, add_batch=add_batch, **kwargs
         )
