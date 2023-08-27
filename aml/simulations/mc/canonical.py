@@ -50,7 +50,7 @@ class CanonicalSwapMonteCarlo(Simulation):
 
     def _make_log_entry(self):
         log_entry = {
-            "PE [eV/atom]": self.atoms.get_potential_energy() / len(self.atoms),
+            "PE [eV]": self.atoms.get_potential_energy(),
             "Swap probability": self._prob,
             "Accepted": self._accepted,
             "T [K]": self.temperature.curr_temperature(),
