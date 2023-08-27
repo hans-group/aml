@@ -26,6 +26,7 @@ dependencies = [
   "inflection",
   "tensorboard",
   "matscipy",
+  "lmdb",
 ]
 dynamic = ["version"]
 
