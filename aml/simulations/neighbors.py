@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import torch
 
 from aml.data.neighbor_list import NeighborListBuilder, resolve_neighborlist_builder
@@ -16,7 +18,7 @@ class NeighborlistUpdater:
         backend: str = "ase",
     ):
         self.r_cut = r_cut
-        self.ref = ref
+        self.ref = deepcopy(ref)
         self.tol = tol
         if ref.cell.abs().max() < 1e-6:
             self.space: Space = FreeSpace()
