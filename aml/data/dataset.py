@@ -2,15 +2,18 @@ import bisect
 import pickle
 import warnings
 import zlib
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TypeVar, Union
 
 import lmdb
 import numpy as np
 import torch
-from torch.utils.data import Dataset
-from torch_geometric.data import Batch, InMemoryDataset
-from torchdata.datapipes.iter import IterableWrapper
+from ase import Atoms
+from torch_geometric.data import InMemoryDataset
+from torch_geometric.data.data import BaseData
+from torch_geometric.data.dataset import Dataset, IndexType
+from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 from tqdm import tqdm
 from typing_extensions import Self
 
@@ -18,11 +21,125 @@ from . import datapipes  # noqa: F401
 from .data_structure import AtomsGraph
 from .utils import is_pkl, maybe_list
 
+T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
-IndexType = TypeVar("IndexType", int, slice, list, tuple, np.ndarray, np.integer, torch.Tensor)
+Images = List[Atoms]
 
 
-class SimpleDataset(InMemoryDataset):
+def read_ase_datapipe(data_source: List[str] | List[Images], index: List[str]) -> IterDataPipe:
+    """ASE file reader datapipe.
+
+    Args:
+        data_source (str | list[str]): Path to ASE database.
+        index (str | list[str]): Index of ASE database.
+    """
+    if len(index) == 1:
+        index = index * len(data_source)
+    if len(data_source) != len(index):
+        raise ValueError("Length of data_source and index must be same.")
+    if isinstance(data_source[0], str):
+        dp = IterableWrapper(data_source).zip(IterableWrapper(index))
+        dp = dp.read_ase()
+    elif isinstance(data_source[0], list) and isinstance(data_source[0][0], Atoms):
+        images = []
+        for images_, index_ in zip(data_source, index, strict=True):
+            if index_ == ":":
+                images.extend(images_)
+            else:
+                images.extend(images_[index_])
+        dp = IterableWrapper(images)
+    else:
+        raise TypeError("data_source must be str or list of ASE atoms.")
+    return dp
+
+
+def a2g_datapipe(
+    atoms_dp: IterDataPipe, neighborlist_cutoff: float, neighborlist_backend: str, read_properties: bool
+) -> IterDataPipe:
+    """Atoms to graph datapipe.
+
+    Args:
+        atoms_dp (IterDataPipe): Data pipeline that yields ASE atoms.
+        neighborlist_cutoff (float): Cutoff radius for neighborlist.
+        neighborlist_backend (str): Backend for neighborlist computation.
+    """
+    dp = atoms_dp.atoms_to_graph(read_properties=read_properties)
+    dp = dp.build_neighbor_list(cutoff=neighborlist_cutoff, backend=neighborlist_backend)
+    return dp
+
+
+class GraphDatasetMixin(ABC):
+    """Mixin class for graph dataset."""
+
+    @property
+    @abstractmethod
+    def avg_num_neighbors(self):
+        """Compute average number of neighbors per atom."""
+
+    def subset(self, n: int, seed: int = 0, return_idx=False) -> Self:
+        """Create a subset of the dataset with `n` elements."""
+        indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
+        if return_idx:
+            return self[indices[:n]], indices[:n]
+        return self[indices[:n]]
+
+    def split(self, n: int, seed: int = 0, return_idx=False) -> Tuple[Self, Self]:
+        """Split the dataset into two subsets of `n` and `len(self) - n` elements."""
+        indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
+        if return_idx:
+            return (self[indices[:n]], self[indices[n:]]), (indices[:n], indices[n:])
+        return self[indices[:n]], self[indices[n:]]
+
+    def train_val_test_split(self, train_size, val_size, seed: int = 0, return_idx=False) -> Tuple[Self, Self, Self]:
+        num_data = len(self)
+
+        if isinstance(train_size, float):
+            train_size = int(train_size * num_data)
+
+        if isinstance(val_size, float):
+            val_size = int(val_size * num_data)
+
+        if train_size + val_size > num_data:
+            raise ValueError("train_size and val_size are too large.")
+
+        if return_idx:
+            (train_dataset, rest_dataset), (train_idx, _) = self.split(train_size, seed, return_idx)
+            (val_dataset, test_dataset), (val_idx, test_idx) = rest_dataset.split(val_size, seed, return_idx)
+            return (train_dataset, val_dataset, test_dataset), (train_idx, val_idx, test_idx)
+
+        train_dataset, rest_dataset = self.split(train_size, seed)
+        val_dataset, test_dataset = rest_dataset.split(val_size, seed)
+        return train_dataset, val_dataset, test_dataset
+
+    def write_lmdb(
+        self,
+        path: str,
+        map_size: int = 1099511627776 * 2,
+        prog_bar: bool = True,
+        compress: bool = False,
+    ):
+        """Write dataset to LMDB database.
+
+        Args:
+            path (str): Path to LMDB database.
+            map_size (int, optional): Size of memory mapping. Defaults to 1099511627776*2.
+            prog_bar (bool, optional): Whether to show progress bar. Defaults to True.
+            compress (bool, optional): Whether to compress data by zlib. Defaults to False.
+        """
+        db = lmdb.open(path, map_size=map_size, subdir=False, meminit=False, map_async=True)
+        dataiter = tqdm(self, total=len(self)) if prog_bar else self
+        for i, data in enumerate(dataiter):
+            pkl = pickle.dumps(data)
+            if compress:
+                pkl = zlib.compress(pkl)
+            txn = db.begin(write=True)
+            txn.put(str(i).encode("ascii"), pkl)
+            txn.commit()
+        db.sync()
+        db.close()
+
+
+class SimpleDataset(InMemoryDataset, GraphDatasetMixin):
     def __init__(self, dp=None):
         super().__init__()
         if dp is not None:
@@ -45,10 +162,10 @@ class SimpleDataset(InMemoryDataset):
         return self._data.edge_index.size(1) / self._data.pos.size(0)
 
 
-class ASEDataset(InMemoryDataset):
+class ASEDataset(InMemoryDataset, GraphDatasetMixin):
     def __init__(
         self,
-        data_source: str | List[str],
+        data_source: str | List[str] | Images | List[Images],
         index: str | List[str] = ":",
         neighborlist_cutoff: float = 5.0,
         neighborlist_backend: str = "ase",
@@ -59,6 +176,9 @@ class ASEDataset(InMemoryDataset):
     ):
         super().__init__()
         data_source = maybe_list(data_source)
+        # Additional listify for raw images input
+        if isinstance(data_source, list) and isinstance(data_source[0], Atoms):
+            data_source = [data_source]
         index = maybe_list(index)
         self.__args = (data_source, index, neighborlist_cutoff, neighborlist_backend, progress_bar, atomref_energies)
         self.data_source = data_source
@@ -74,12 +194,6 @@ class ASEDataset(InMemoryDataset):
             )
         self.atomref_energies = None
 
-        # sanity check
-        if len(self.index) == 1:
-            self.index = self.index * len(self.data_source)
-        if len(self.data_source) != len(self.index):
-            raise ValueError("Length of data_source and index must be same.")
-
         if cache_path is not None:
             cache_path = Path(cache_path)
             if cache_path.exists():
@@ -91,13 +205,8 @@ class ASEDataset(InMemoryDataset):
         else:
             # build data pipeline
             if build:
-                dp = IterableWrapper(self.data_source).zip(IterableWrapper(self.index))
-                dp = dp.read_ase()
-                dp = dp.atoms_to_graph()
-                if atomref_energies is not None:
-                    dp = dp.subtract_atomref(atomref_energies)
-                dp = dp.build_neighbor_list(cutoff=self.neighborlist_cutoff, backend=self.neighborlist_backend)
-
+                dp = read_ase_datapipe(self.data_source, self.index)
+                dp = a2g_datapipe(dp, self.neighborlist_cutoff, self.neighborlist_backend, read_properties=True)
                 dp_iter = tqdm(dp) if self.progress_bar else dp
                 data_list = [d for d in dp_iter]
                 self.data, self.slices = self.collate(data_list)
@@ -126,41 +235,6 @@ class ASEDataset(InMemoryDataset):
     def to_ase(self):
         return [atoms.to_ase() for atoms in self]
 
-    def split(self, n: int, seed: int = 0, return_idx=False) -> Tuple[Self, Self]:
-        """Split the dataset into two subsets of `n` and `len(self) - n` elements."""
-        indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
-        if return_idx:
-            return (self[indices[:n]], self[indices[n:]]), (indices[:n], indices[n:])
-        return self[indices[:n]], self[indices[n:]]
-
-    def subset(self, n: int, seed: int = 0, return_idx=False) -> Self:
-        """Create a subset of the dataset with `n` elements."""
-        indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
-        if return_idx:
-            return self[indices[:n]], indices[:n]
-        return self[indices[:n]]
-
-    def train_val_test_split(self, train_size, val_size, seed: int = 0, return_idx=False) -> Tuple[Self, Self, Self]:
-        num_data = len(self)
-
-        if isinstance(train_size, float):
-            train_size = int(train_size * num_data)
-
-        if isinstance(val_size, float):
-            val_size = int(val_size * num_data)
-
-        if train_size + val_size > num_data:
-            raise ValueError("train_size and val_size are too large.")
-
-        if return_idx:
-            (train_dataset, rest_dataset), (train_idx, _) = self.split(train_size, seed, return_idx)
-            (val_dataset, test_dataset), (val_idx, test_idx) = rest_dataset.split(val_size, seed, return_idx)
-            return (train_dataset, val_dataset, test_dataset), (train_idx, val_idx, test_idx)
-
-        train_dataset, rest_dataset = self.split(train_size, seed)
-        val_dataset, test_dataset = rest_dataset.split(val_size, seed)
-        return train_dataset, val_dataset, test_dataset
-
     @property
     def avg_num_neighbors(self):
         return self._data.edge_index.size(1) / self._data.pos.size(0)
@@ -179,7 +253,7 @@ class ASEDataset(InMemoryDataset):
         return cls(**config)
 
 
-class LMDBDataset(Dataset[T_co]):
+class LMDBDataset(Dataset, GraphDatasetMixin):
     """Dataset using LMDB memory-mapped db.
     This dataset is designed for large dataset that cannot be loaded into memory.
     Expects db to store {idx: data} pairs, where idx is integer and data is a pickled object.
@@ -190,10 +264,9 @@ class LMDBDataset(Dataset[T_co]):
         collate_data (bool, optional): Whether to collate data into a Batch. Defaults to False.
     """
 
-    def __init__(self, db_path: str | list[str], collate_data: bool = False):
+    def __init__(self, db_path: str | list[str]):
         super().__init__()
         self.db_path = maybe_list(db_path)
-        self.collate_data = collate_data
 
         self.envs = [self.connect_db(path) for path in self.db_path]
         self.db_lengths = [self.get_db_length(env) for env in self.envs]
@@ -208,11 +281,8 @@ class LMDBDataset(Dataset[T_co]):
         return env
 
     def close_db(self) -> None:
-        if not self.db_path.is_file():
-            for env in self.envs:
-                env.close()
-        else:
-            self.env.close()
+        for env in self.envs:
+            env.close()
 
     @staticmethod
     def get_db_length(env: lmdb.Environment) -> int:
@@ -226,49 +296,25 @@ class LMDBDataset(Dataset[T_co]):
             length -= 1
         return length
 
-    def __len__(self):
+    def len(self) -> int:
         return sum(self.db_lengths)
 
-    def __getitem__(self, idx: IndexType) -> T_co:
-        def _get_single(idx):
-            # Determine which db to use
-            env_idx = bisect.bisect(self.cumsum_db_lengths, idx)
-            elem_idx = idx - self.cumsum_db_lengths[env_idx - 1] if env_idx > 0 else idx
-            txn = self.envs[env_idx].begin()
-            # Get data (compressed by zlib or not)
-            pkl = txn.get(str(elem_idx).encode("ascii"))
-            if not is_pkl(pkl):
-                pkl = zlib.decompress(pkl)
-            data = pickle.loads(pkl)
-            return data
+    def get(self, idx: int) -> BaseData:
+        # Determine which db to use
+        env_idx = bisect.bisect(self.cumsum_db_lengths, idx)
+        elem_idx = idx - self.cumsum_db_lengths[env_idx - 1] if env_idx > 0 else idx
+        txn = self.envs[env_idx].begin()
+        # Get data (compressed by zlib or not)
+        pkl = txn.get(str(elem_idx).encode("ascii"))
+        if not is_pkl(pkl):
+            pkl = zlib.decompress(pkl)
+        data = pickle.loads(pkl)
+        return data
 
-        if isinstance(idx, (list, tuple)):
-            datalist = [_get_single(i) for i in idx]
-            if self.collate_data:
-                return Batch.from_data_list(datalist)
-            return datalist
-        elif isinstance(idx, slice):
-            start = idx.start or 0
-            stop = idx.stop or len(self)
-            step = idx.step or 1
-            indices = list(range(start, stop, step))
-            return self[indices]
-        elif isinstance(idx, (np.ndarray, torch.Tensor)):
-            if idx.shape == ():
-                return _get_single(idx.item())
-            else:
-                return self[idx.tolist()]
-        elif isinstance(idx, (int, np.integer)):
-            return _get_single(int(idx))
-        else:
-            raise TypeError(f"Invalid argument type {type(idx)}")
-
-    def get_batch(self, idx: IndexType) -> Batch:
-        """Get all values"""
-        datalist = self[idx]
-        if isinstance(datalist, list):
-            return Batch.from_data_list(datalist)
-        return datalist
-
-    def __repr__(self):
-        return f"LMDBDataset({len(self)})"
+    @property
+    def avg_num_neighbors(self):
+        avg_num_neighbors = 0
+        for i in range(len(self)):
+            data = self.get(i)
+            avg_num_neighbors += data.edge_index.size(1) / data.pos.size(0) / len(self)
+        return avg_num_neighbors
