@@ -1,18 +1,25 @@
+import bisect
+import pickle
 import warnings
+import zlib
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Tuple, TypeVar, Union
 
+import lmdb
 import numpy as np
 import torch
-from torch_geometric.data import InMemoryDataset
+from torch.utils.data import Dataset
+from torch_geometric.data import Batch, InMemoryDataset
 from torchdata.datapipes.iter import IterableWrapper
 from tqdm import tqdm
 from typing_extensions import Self
 
 from . import datapipes  # noqa: F401
 from .data_structure import AtomsGraph
+from .utils import is_pkl, maybe_list
 
-IndexType = slice | torch.Tensor | np.ndarray | Sequence
+T_co = TypeVar("T_co", covariant=True)
+IndexType = TypeVar("IndexType", int, slice, list, tuple, np.ndarray, np.integer, torch.Tensor)
 
 
 class SimpleDataset(InMemoryDataset):
@@ -51,8 +58,8 @@ class ASEDataset(InMemoryDataset):
         cache_path: str | None = None,
     ):
         super().__init__()
-        data_source = _maybe_listify(data_source)
-        index = _maybe_listify(index)
+        data_source = maybe_list(data_source)
+        index = maybe_list(index)
         self.__args = (data_source, index, neighborlist_cutoff, neighborlist_backend, progress_bar, atomref_energies)
         self.data_source = data_source
         self.index = index
@@ -172,7 +179,96 @@ class ASEDataset(InMemoryDataset):
         return cls(**config)
 
 
-def _maybe_listify(x):
-    if x is None:
-        return []
-    return x if isinstance(x, list) else [x]
+class LMDBDataset(Dataset[T_co]):
+    """Dataset using LMDB memory-mapped db.
+    This dataset is designed for large dataset that cannot be loaded into memory.
+    Expects db to store {idx: data} pairs, where idx is integer and data is a pickled object.
+    The data could be compressed by zlib or not.
+
+    Args:
+        db_path (str | list[str]): Path to LMDB database
+        collate_data (bool, optional): Whether to collate data into a Batch. Defaults to False.
+    """
+
+    def __init__(self, db_path: str | list[str], collate_data: bool = False):
+        super().__init__()
+        self.db_path = maybe_list(db_path)
+        self.collate_data = collate_data
+
+        self.envs = [self.connect_db(path) for path in self.db_path]
+        self.db_lengths = [self.get_db_length(env) for env in self.envs]
+        self.cumsum_db_lengths = np.cumsum(self.db_lengths).tolist()
+        self.db_indices = [list(range(length)) for length in self.db_lengths]
+
+    @staticmethod
+    def connect_db(lmdb_path: Optional[Path] = None) -> lmdb.Environment:
+        env = lmdb.open(
+            str(lmdb_path), subdir=False, readonly=True, lock=False, readahead=True, meminit=False, max_readers=1
+        )
+        return env
+
+    def close_db(self) -> None:
+        if not self.db_path.is_file():
+            for env in self.envs:
+                env.close()
+        else:
+            self.env.close()
+
+    @staticmethod
+    def get_db_length(env: lmdb.Environment) -> int:
+        txn = env.begin()
+        if (length_pkl := txn.get("length".encode("ascii"))) is not None:
+            length = pickle.loads(length_pkl)
+            assert isinstance(length, int)
+        else:
+            length = env.stat()["entries"]
+        if txn.get("metadata".encode("ascii")) is not None:
+            length -= 1
+        return length
+
+    def __len__(self):
+        return sum(self.db_lengths)
+
+    def __getitem__(self, idx: IndexType) -> T_co:
+        def _get_single(idx):
+            # Determine which db to use
+            env_idx = bisect.bisect(self.cumsum_db_lengths, idx)
+            elem_idx = idx - self.cumsum_db_lengths[env_idx - 1] if env_idx > 0 else idx
+            txn = self.envs[env_idx].begin()
+            # Get data (compressed by zlib or not)
+            pkl = txn.get(str(elem_idx).encode("ascii"))
+            if not is_pkl(pkl):
+                pkl = zlib.decompress(pkl)
+            data = pickle.loads(pkl)
+            return data
+
+        if isinstance(idx, (list, tuple)):
+            datalist = [_get_single(i) for i in idx]
+            if self.collate_data:
+                return Batch.from_data_list(datalist)
+            return datalist
+        elif isinstance(idx, slice):
+            start = idx.start or 0
+            stop = idx.stop or len(self)
+            step = idx.step or 1
+            indices = list(range(start, stop, step))
+            return self[indices]
+        elif isinstance(idx, (np.ndarray, torch.Tensor)):
+            if idx.shape == ():
+                return _get_single(idx.item())
+            else:
+                return self[idx.tolist()]
+        elif isinstance(idx, (int, np.integer)):
+            return _get_single(int(idx))
+        else:
+            raise TypeError(f"Invalid argument type {type(idx)}")
+
+    def get_batch(self, idx: IndexType) -> Batch:
+        """Get all values"""
+        datalist = self[idx]
+        if isinstance(datalist, list):
+            return Batch.from_data_list(datalist)
+        return datalist
+
+    def __repr__(self):
+        return f"LMDBDataset({len(self)})"
