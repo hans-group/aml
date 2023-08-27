@@ -27,6 +27,7 @@ dependencies = [
   "tensorboard",
   "matscipy",
   "lmdb",
+  "ase-extension",
 ]
 dynamic = ["version"]
 
