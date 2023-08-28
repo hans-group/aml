@@ -68,39 +68,46 @@ def a2g_datapipe(
     return dp
 
 
+def _determine_size(dataset, size):
+    if isinstance(size, float):
+        size = int(len(dataset) * size)
+    elif isinstance(size, int):
+        size = size
+    else:
+        raise TypeError(f"size must be int or float, not {type(size)}")
+    if size > len(dataset):
+        raise ValueError(f"size must be less than or equal to the length of dataset, {len(dataset)}, but got {size}")
+    return size
+
+
 class GraphDatasetMixin(ABC):
     """Mixin class for graph dataset."""
 
-    @property
-    @abstractmethod
-    def avg_num_neighbors(self):
-        """Compute average number of neighbors per atom."""
-
-    def subset(self, n: int, seed: int = 0, return_idx=False) -> Self:
+    def subset(self, size: int | float, seed: int = 0, return_idx=False) -> Self:
         """Create a subset of the dataset with `n` elements."""
+        size = _determine_size(self, size)
         indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
         if return_idx:
-            return self[indices[:n]], indices[:n]
-        return self[indices[:n]]
+            return self[indices[:size]], indices[:size]
+        return self[indices[:size]]
 
-    def split(self, n: int, seed: int = 0, return_idx=False) -> Tuple[Self, Self]:
+    def split(self, size: int | float, seed: int = 0, return_idx=False) -> Tuple[Self, Self]:
         """Split the dataset into two subsets of `n` and `len(self) - n` elements."""
+        size = _determine_size(self, size)
         indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
         if return_idx:
-            return (self[indices[:n]], self[indices[n:]]), (indices[:n], indices[n:])
-        return self[indices[:n]], self[indices[n:]]
+            return (self[indices[:size]], self[indices[size:]]), (indices[:size], indices[size:])
+        return self[indices[:size]], self[indices[size:]]
 
-    def train_val_test_split(self, train_size, val_size, seed: int = 0, return_idx=False) -> Tuple[Self, Self, Self]:
-        num_data = len(self)
-
-        if isinstance(train_size, float):
-            train_size = int(train_size * num_data)
-
-        if isinstance(val_size, float):
-            val_size = int(val_size * num_data)
-
-        if train_size + val_size > num_data:
-            raise ValueError("train_size and val_size are too large.")
+    def train_val_test_split(
+        self,
+        train_size: int | float,
+        val_size: int | float,
+        seed: int = 0,
+        return_idx=False,
+    ) -> Tuple[Self, Self, Self]:
+        train_size = _determine_size(self, train_size)
+        val_size = _determine_size(self, val_size)
 
         if return_idx:
             (train_dataset, rest_dataset), (train_idx, _) = self.split(train_size, seed, return_idx)
@@ -137,6 +144,11 @@ class GraphDatasetMixin(ABC):
             txn.commit()
         db.sync()
         db.close()
+
+    @property
+    @abstractmethod
+    def avg_num_neighbors(self):
+        """Compute average number of neighbors per atom."""
 
 
 class SimpleDataset(InMemoryDataset, GraphDatasetMixin):
