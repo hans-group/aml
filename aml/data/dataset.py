@@ -129,7 +129,7 @@ class GraphDatasetMixin(ABC):
         db = lmdb.open(path, map_size=map_size, subdir=False, meminit=False, map_async=True)
         dataiter = tqdm(self, total=len(self)) if prog_bar else self
         for i, data in enumerate(dataiter):
-            pkl = pickle.dumps(data)
+            pkl = pickle.dumps(data.clone())
             if compress:
                 pkl = zlib.compress(pkl)
             txn = db.begin(write=True)
