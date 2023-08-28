@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TypeVar, Union
 
+import ase.data
 import lmdb
 import numpy as np
 import torch
@@ -80,6 +81,23 @@ def _determine_size(dataset, size):
     return size
 
 
+def _check_scalar_key(data, key):
+    sample_value = data[key].squeeze()
+    if not sample_value.ndim == 0:
+        raise ValueError(f"Value of '{key}' must be a scalar.")
+
+
+def _check_atomic_property_key(data, key):
+    sample_value = data[key]
+    if sample_value.size(0) != data.num_nodes:
+        raise ValueError(f"Value of '{key}' must have the same length as the number of nodes.")
+
+
+def _check_contain_key(data, key):
+    if key not in data:
+        raise ValueError(f"Data must contain '{key}' field.")
+
+
 class GraphDatasetMixin(ABC):
     """Mixin class for graph dataset."""
 
@@ -149,6 +167,98 @@ class GraphDatasetMixin(ABC):
     @abstractmethod
     def avg_num_neighbors(self):
         """Compute average number of neighbors per atom."""
+
+    @abstractmethod
+    def __getitem__(self, idx: Union[int, np.integer, IndexType]) -> Union[Self, BaseData]:
+        """Get item from dataset."""
+
+    # Statistics
+    def avg_atomic_property(self, key: str) -> dict[str, float]:
+        """Compute average atomic property.
+        Only makes sense if the property is extensive scalar property. ex) total energy
+
+        Args:
+            dataset (GraphDatasetMixin):
+            key (str): _description_
+
+        Raises:
+            ValueError: _description_
+            ValueError: _description_
+
+        Returns:
+            dict[str, float]: _description_
+        """
+        sample = self[0]
+        _check_contain_key(sample, "elems")
+        _check_contain_key(sample, key)
+        _check_scalar_key(sample, key)
+
+        data_list = [data for data in self]
+        elems = np.concatenate([data.elems for data in data_list])
+        species = np.unique(elems)
+        n_structures = len(self)
+        n_elems = len(species)
+
+        A = np.zeros((n_structures, n_elems))
+        B = np.zeros((n_structures,))
+        for i, data in enumerate(data_list):
+            B[i] = data[key].squeeze().item()
+            for j, elem in enumerate(species):
+                A[i, j] = np.count_nonzero(data.elems == elem)
+
+        try:
+            solution = np.linalg.lstsq(A, B, rcond=None)[0]
+            atomic_properties = {}
+            for i, elem in enumerate(species):
+                symbol = ase.data.chemical_symbols[elem]
+                atomic_properties[symbol] = solution[i]
+        except np.linalg.LinAlgError:
+            atomic_properties = {}
+            for elem in species:
+                symbol = ase.data.chemical_symbols[elem]
+                atomic_properties[symbol] = 0.0
+        return atomic_properties
+
+    def get_statistics(self, key, per_atom=False, per_species=False, reduce="mean"):
+        if reduce == "mean":
+            reduce_fn = torch.mean
+        elif reduce == "std":
+            reduce_fn = torch.std
+        elif reduce == "rms":
+
+            def reduce_fn(x):
+                return torch.sqrt(torch.mean(x**2))
+
+        sample = self[0]
+        data_list = [data for data in self]
+        _check_contain_key(sample, key)
+        if per_atom and per_species:
+            raise ValueError("per_atom and per_species cannot be True at the same time.")
+        if per_atom:
+            _check_contain_key(sample, "n_atoms")
+            _check_scalar_key(sample, key)
+        if per_species:
+            _check_atomic_property_key(sample, key)
+            elems = torch.cat([data.elems for data in data_list], dim=0)
+            species = torch.unique(elems)
+            values = {k.item(): [] for k in species}
+            for data in data_list:
+                elems = data.elems
+                for s in species:
+                    values[s.item()].append(data[key][elems == s])
+            values = {k: torch.cat(v, dim=0) for k, v in values.items()}
+            return {ase.data.chemical_symbols[k]: reduce_fn(v).item() for k, v in values.items()}
+        else:
+            values = []
+            for data in data_list:
+                x = data[key]
+                if x.ndim == 0:
+                    x = x.unsqueeze(0)
+                if per_atom:
+                    x = x / data.n_atoms
+                values.append(x)
+            values = torch.cat(values, dim=0)
+            return reduce_fn(values)
 
 
 class SimpleDataset(InMemoryDataset, GraphDatasetMixin):
