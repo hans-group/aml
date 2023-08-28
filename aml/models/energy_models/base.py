@@ -7,10 +7,10 @@ from typing import Literal
 import numpy as np
 import torch
 import torch.nn
-from torch_geometric.data import InMemoryDataset
 
 from aml.common.registry import registry
 from aml.common.utils import compute_average_E0s, compute_force_rms_per_species, load_config
+from aml.data.dataset import GraphDatasetMixin
 from aml.nn.scale import PerSpeciesScaleShift
 from aml.typing import DataDict, Tensor
 
@@ -71,8 +71,8 @@ class BaseEnergyModel(torch.nn.Module, ABC):
         atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
         energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         trainable_scales: bool = True,
-        dataset: InMemoryDataset | None = None,
-        dataset_stride: int | None = None,
+        dataset: GraphDatasetMixin | None = None,
+        subset_size: int | float | None = None,
     ):
         """Initialize the model.
         This typically means setting up the energy scales.
@@ -82,6 +82,8 @@ class BaseEnergyModel(torch.nn.Module, ABC):
         Args:
             dataset (_type_): Dataset to initialize the model with.
         """
+        if dataset is not None and subset_size is not None:
+            dataset = dataset.subset(subset_size)
 
         def _check_dict_species(d):
             if set(self.species) != set(d.keys()):
@@ -97,7 +99,7 @@ class BaseEnergyModel(torch.nn.Module, ABC):
             if energy_mean == "auto":
                 if dataset is None:
                     raise ValueError(_no_dataset_msg)
-                _mean_val = (dataset._data.energy / dataset._data.n_atoms).mean().item()
+                _mean_val = dataset.get_statistics("energy", per_atom=True, reduce="mean")
             elif energy_mean is None:
                 _mean_val = 0.0
             elif isinstance(energy_mean, (float, int, np.ndarray, torch.Tensor)):
@@ -111,7 +113,7 @@ class BaseEnergyModel(torch.nn.Module, ABC):
             if atomic_energies == "auto":
                 if dataset is None:
                     raise ValueError(_no_dataset_msg)
-                atomic_energies = compute_average_E0s(dataset, stride=dataset_stride)
+                atomic_energies = dataset.avg_atomic_property("energy")
             elif atomic_energies is None:
                 atomic_energies = {s: 0.0 for s in self.species}
             elif isinstance(atomic_energies, dict):
@@ -126,10 +128,10 @@ class BaseEnergyModel(torch.nn.Module, ABC):
             if dataset is None:
                 raise ValueError(_no_dataset_msg)
             if energy_scale_mode == "energy_std":
-                _scale_val = dataset._data.energy.std().item()
+                _scale_val = dataset.get_statistics("energy", reduce="std")
                 per_species_energy_scales = {s: _scale_val for s in self.species}
             elif energy_scale_mode == "force_rms":
-                per_species_energy_scales = compute_force_rms_per_species(dataset, stride=dataset_stride)
+                per_species_energy_scales = dataset.get_statistics("force", per_species=True, reduce="rms")
             else:
                 raise ValueError("Invalid value is given for energy_scale_mode. Must be 'energy_std' or 'force_rms'.")
         elif energy_scale is None:

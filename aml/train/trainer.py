@@ -3,6 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 from pprint import pprint
 from typing import Any, Literal
+import warnings
 
 import lightning as L
 import torch
@@ -35,6 +36,7 @@ class PotentialTrainer:
         atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
         energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         autoscale_dataset_stride: int | None = None,
+        autoscale_subset_size: int | float | None = None,
         trainable_scales: bool = True,
         # Hyperparameters for LightningModule
         train_force: bool = True,
@@ -81,6 +83,9 @@ class PotentialTrainer:
         self.atomic_energies = atomic_energies
         self.energy_scale = energy_scale
         self.autoscale_dataset_stride = autoscale_dataset_stride
+        if autoscale_dataset_stride is not None:
+            warnings.warn("autoscale_dataset_stride is deprecated. Use autoscale_subset_size instead.", stacklevel=1)
+        self.autoscale_subset_size = autoscale_subset_size
         self.trainable_scales = trainable_scales
 
         self.train_force = train_force
@@ -301,7 +306,7 @@ class PotentialTrainer:
             atomic_energies=self.atomic_energies,
             energy_scale=self.energy_scale,
             trainable_scales=self.trainable_scales,
-            autoscale_dataset_stride=self.autoscale_dataset_stride,
+            autoscale_subset_size=self.autoscale_subset_size,
         )
         self.training_module.initialize(self.datasets[0])
         train_loader, val_loader, _ = self._build_dataloaders()

@@ -49,7 +49,7 @@ class PotentialTrainingModule(L.LightningModule):
         atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
         energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         trainable_scales: bool = True,
-        autoscale_dataset_stride: int | None = None,
+        autoscale_subset_size: int | float | None = None,
     ):
         super().__init__()
         self.model, self.model_config = resolve_model(model)
@@ -68,7 +68,7 @@ class PotentialTrainingModule(L.LightningModule):
         self.atomic_energies = atomic_energies
         self.energy_scale = energy_scale
         self.trainable_scales = trainable_scales
-        self.autoscale_dataset_stride = autoscale_dataset_stride
+        self.autoscale_subset_size = autoscale_subset_size
 
         if "force" in self.loss_keys:
             self.model.compute_force = True
@@ -118,7 +118,7 @@ class PotentialTrainingModule(L.LightningModule):
             self.energy_scale,
             self.trainable_scales,
             dataset,
-            self.autoscale_dataset_stride,
+            self.autoscale_subset_size,
         )
         self._initialized = True
 
