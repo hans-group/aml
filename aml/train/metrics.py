@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 
 import torch
@@ -48,20 +49,25 @@ class MAE(Metric):
         return F.l1_loss(pred, target)
 
 
+def _find_matching_key(dict_, key):
+    for key_ in dict_:
+        if key.strip().lower() == key_.strip().lower():
+            return dict_[key_]
+
+
+available_metrics = [
+    x.lower() for x in globals() if isinstance(globals()[x], type) and issubclass(globals()[x], Metric)
+]
+
+
 def get_metric_fn(name: str) -> Metric:
-    def parse_name(s: str) -> tuple[str, str, bool]:
-        if s.startswith("per_atom_"):
-            return parse_name(s[9:])[:2] + (True,)
-        else:
-            parts = s.split("_")
-            assert len(parts) == 2, f"Invalid metric name: {s}"
-            key, metric_name = parts
-            return metric_name, key, False
-
-    metric_name, key, per_atom = parse_name(name)
-    if key not in ("energy", "force", "stress"):
-        raise ValueError(f"Invalid metric key: {key}")
-
+    regex = re.compile(r"(per_atom_)?([a-zA-Z0-9_]+)_({})?".format("|".join(available_metrics)))
+    matches = regex.findall(name)
+    if len(matches) > 1:
+        raise ValueError("Invalid format of metric")
+    assert len(matches[0]) == 3
+    per_atom, key, metric_name = matches[0]
+    per_atom = bool(per_atom)
     # Getattr from this module
-    metric_cls = globals()[metric_name.upper()]
-    return metric_cls(key, per_atom)
+    metric_cls = _find_matching_key(globals(), metric_name)
+    return metric_cls(key, per_atom=per_atom)
