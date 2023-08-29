@@ -36,8 +36,8 @@ energy_scale_mode: force_rms
 energy_mean: null  # Must be per atom
 atomic_energies: auto
 energy_scale: auto
-autoscale_dataset_stride: null
-trainable_cales: true
+autoscale_subset_size: null
+trainable_scales: true
 
 # Hyperparameters for training
 ## Global config
