@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import warnings
 
 import torch
@@ -32,6 +34,10 @@ class ASEDataset(InMemoryDataset, BaseDataset):
         # Additional listify for raw images input
         if isinstance(data_source, list) and isinstance(data_source[0], Atoms):
             data_source = [data_source]
+        for i in range(len(data_source)):
+            if isinstance(data_source[i], (str, Path)):
+                data_source[i] = os.path.abspath(data_source[i])
+
         index = maybe_list(index)
         self.data_source = data_source
         self.index = index
@@ -64,6 +70,19 @@ class ASEDataset(InMemoryDataset, BaseDataset):
 
     def to_ase(self):
         return [atoms.to_ase() for atoms in self]
+
+    def get_config(self):
+        config = super().get_config()
+        if isinstance(self.data_source[0][0], Atoms):
+            config["data_source"] = "@raw"
+            config["index"] = None
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        if config["data_source"] == "@raw":
+            raise ValueError("Cannot load from config when data_source is raw images.")
+        return super().from_config(config)
 
 
 def read_ase_datapipe(data_source: list[str] | list[Images], index: list[str]) -> IterDataPipe:
