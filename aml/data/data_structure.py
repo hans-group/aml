@@ -54,7 +54,6 @@ class AtomsGraph(Data):
         node_vec_features: OptTensor = None,
         edge_vec_features: OptTensor = None,
         global_vec_features: OptTensor = None,
-        n_atoms: int = None,
         add_batch: bool = False,
         **kwargs,
     ):
@@ -73,9 +72,19 @@ class AtomsGraph(Data):
         self.node_vec_features = node_vec_features
         self.edge_vec_features = edge_vec_features
         self.global_vec_features = global_vec_features
-        self.n_atoms = n_atoms
-        if pos is not None and n_atoms is not None:
+        if elems is not None:
+            self.n_atoms = torch.tensor([elems.size(0)], dtype=torch.long)
+
+        if pos is not None:
             assert pos.shape[0] == elems.shape[0], "Number of atoms and number of positions must be same."
+        if cell is None and pos is not None:
+            self.cell = torch.zeros((1, 3, 3), dtype=_default_dtype)
+        if cell is not None:
+            if cell.ndim == 2:
+                self.cell = cell.unsqueeze(0)
+        if energy is not None and energy.ndim == 0:
+            self.energy = energy.unsqueeze(0)
+
         if add_batch:
             self.batch = torch.zeros_like(elems, dtype=torch.long, device=pos.device)
 
