@@ -166,6 +166,7 @@ class Registry:
         "logger_name_mapping": _find_all_pl_loggers(),
         "activation_name_mapping": _find_all_torch_activations(),
         "initializer_name_mapping": _find_all_torch_initilizers(),
+        "dataset_name_mapping": {},
         "state": {},
     }
 
@@ -204,6 +205,10 @@ class Registry:
     @classmethod
     def list_initializers(cls):
         return list(cls.mapping["initializer_name_mapping"].keys())
+
+    @classmethod
+    def list_datasets(cls):
+        return list(cls.mapping["dataset_name_mapping"].keys())
 
     @classmethod
     def register_callback(cls, name):
@@ -293,6 +298,15 @@ class Registry:
         return wrap
 
     @classmethod
+    def register_dataset(cls, name):
+        def wrap(func):
+            func.name = name
+            cls.mapping["dataset_name_mapping"][name] = func
+            return func
+
+        return wrap
+
+    @classmethod
     def register(cls, name, obj):
         path = name.split(".")
         current = cls.mapping["state"]
@@ -354,6 +368,11 @@ class Registry:
     @classmethod
     def get_initializer_function(cls, name):
         key = "initializer_name_mapping"
+        return cls._get(name, key)
+
+    @classmethod
+    def get_dataset_class(cls, name):
+        key = "dataset_name_mapping"
         return cls._get(name, key)
 
     @classmethod

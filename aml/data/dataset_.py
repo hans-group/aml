@@ -98,8 +98,8 @@ def _check_contain_key(data, key):
         raise ValueError(f"Data must contain '{key}' field.")
 
 
-class GraphDatasetMixin(ABC):
-    """Mixin class for graph dataset."""
+class BaseGraphDataset(torch.utils.data.Dataset, ABC):
+    """Abstract base class for graph dataset."""
 
     def subset(self, size: int | float, seed: int = 0, return_idx=False) -> Self:
         """Create a subset of the dataset with `n` elements."""
@@ -261,7 +261,7 @@ class GraphDatasetMixin(ABC):
             return reduce_fn(values)
 
 
-class SimpleDataset(InMemoryDataset, GraphDatasetMixin):
+class SimpleDataset(InMemoryDataset, BaseGraphDataset):
     def __init__(self, dp=None):
         super().__init__()
         if dp is not None:
@@ -284,7 +284,7 @@ class SimpleDataset(InMemoryDataset, GraphDatasetMixin):
         return self._data.edge_index.size(1) / self._data.pos.size(0)
 
 
-class ASEDataset(InMemoryDataset, GraphDatasetMixin):
+class ASEDataset(InMemoryDataset, BaseGraphDataset):
     def __init__(
         self,
         data_source: str | List[str] | Images | List[Images],
@@ -375,7 +375,7 @@ class ASEDataset(InMemoryDataset, GraphDatasetMixin):
         return cls(**config)
 
 
-class LMDBDataset(Dataset, GraphDatasetMixin):
+class LMDBDataset(Dataset, BaseGraphDataset):
     """Dataset using LMDB memory-mapped db.
     This dataset is designed for large dataset that cannot be loaded into memory.
     Expects db to store {idx: data} pairs, where idx is integer and data is a pickled object.
