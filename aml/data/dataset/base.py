@@ -200,11 +200,9 @@ class BaseDataset(Dataset, ABC):
         config = deepcopy(config)
         name = config.pop("@name", None)
         config.pop("@category", None)
-        if cls.__name__ == "BaseGraphDataset":
+        if cls.__name__ == "BaseDataset":
             if name is None:
-                raise ValueError(
-                    "Cannot initialize BaseGraphDataset from config. Please specify the name of the model."
-                )
+                raise ValueError("Cannot initialize BaseDataset from config. Please specify the name of the model.")
             model_class = registry.get_dataset_class(name)
         else:
             model_class = cls
