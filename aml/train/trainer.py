@@ -210,10 +210,10 @@ class PotentialTrainer:
 
     def _build_dataloaders(self) -> tuple[DataLoader, DataLoader, DataLoader | None]:
         train_dataset, val_dataset, test_dataset = self.datasets
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=1)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0)
         if test_dataset is not None:
-            test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
+            test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0)
         else:
             test_loader = None
         return train_loader, val_loader, test_loader
