@@ -11,7 +11,8 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProg
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
 from torch_geometric.loader import DataLoader
 
-from aml.data.dataset import ASEDataset
+from aml.common.registry import registry
+from aml.data.dataset import BaseDataset, InMemoryDataset
 from aml.models.iap import InterAtomicPotential
 from aml.train.callbacks import ExponentialMovingAverage
 from aml.train.lightning_modules import PotentialTrainingModule
@@ -25,8 +26,8 @@ class PotentialTrainer:
         # Model
         model: ConfigDict | InterAtomicPotential,
         # Dataset
-        train_dataset: ConfigDict | ASEDataset,
-        test_dataset: ConfigDict | ASEDataset | None = None,
+        train_dataset: ConfigDict | BaseDataset,
+        test_dataset: ConfigDict | BaseDataset | None = None,
         val_size: float = 0.1,
         batch_size: int = 4,
         dataset_cache_dir: str | None = "data",
@@ -173,21 +174,42 @@ class PotentialTrainer:
         else:
             raise ValueError("The argument model must be either a dict or an InterAtomicPotential instance.")
 
-    def _build_datasets(self) -> tuple[ASEDataset, ASEDataset, ASEDataset | None]:
-        def _build_dataset(maybe_dataset: ASEDataset | dict, cache=None) -> ASEDataset:
+    def _build_datasets(self) -> tuple[BaseDataset, BaseDataset, BaseDataset | None]:
+        def get_dataset_cls(maybe_dataset):
+            if isinstance(maybe_dataset, BaseDataset):
+                return maybe_dataset.__class__
+            else:
+                cls_name = maybe_dataset.get("@name", "ase_dataset")
+                return registry.get_dataset_class(cls_name)
+
+        def is_cachable(maybe_dataset):
+            # Only InMemoryDataset can be cached
+            dataset_cls = get_dataset_cls(maybe_dataset)
+            return issubclass(dataset_cls, InMemoryDataset)
+
+        def _build_dataset(maybe_dataset: BaseDataset | dict, cache=None) -> BaseDataset:
             if maybe_dataset is None:
                 return None
-            if cache:
+            if cache is not None and is_cachable(maybe_dataset):
+                dataset_cls = get_dataset_cls(maybe_dataset)
                 if Path(cache).exists():
-                    return ASEDataset.load(cache)
+                    return dataset_cls.load(cache)
                 else:
                     dataset = _build_dataset(maybe_dataset)
                     dataset.save(cache)
                     return dataset
-            if isinstance(maybe_dataset, ASEDataset):
+            if isinstance(maybe_dataset, BaseDataset):
                 return maybe_dataset
             if isinstance(maybe_dataset, dict):
-                dataset = ASEDataset.from_config(maybe_dataset)
+                if "@name" not in maybe_dataset:
+                    warnings.warn(
+                        "The dataset config does not have a name. "
+                        "Using ase_dataset as default."
+                        "This is deprecated and will raise Error in the future.",
+                        stacklevel=1,
+                    )
+                    maybe_dataset["@name"] = "ase_dataset"
+                dataset = BaseDataset.from_config(maybe_dataset)
             else:
                 raise ValueError("The argument dataset must be either a dict or a Dataset instance.")
             return dataset
@@ -196,13 +218,11 @@ class PotentialTrainer:
         test_cache = self.dataset_cache_dir / "test_dataset.pt" if self.dataset_cache_dir is not None else None
         train_dataset = _build_dataset(self._maybe_train_dataset, cache=train_cache)
         test_dataset = _build_dataset(self._maybe_test_dataset, cache=test_cache)
-        n_val = int(len(train_dataset) * self.val_size)
-        n_train = len(train_dataset) - n_val
-        train_dataset, val_datset = train_dataset.split(n_train)
+        val_datset, train_dataset = train_dataset.split(self.val_size)
         return train_dataset, val_datset, test_dataset
 
     @property
-    def datasets(self) -> tuple[ASEDataset, ASEDataset, ASEDataset | None]:
+    def datasets(self) -> tuple[BaseDataset, BaseDataset, BaseDataset | None]:
         if self._datasets is None:
             print("Building datasets...")
             self._datasets = self._build_datasets()
