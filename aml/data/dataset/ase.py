@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import torch
 from ase import Atoms
