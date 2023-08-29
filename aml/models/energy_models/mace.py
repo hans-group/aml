@@ -13,12 +13,12 @@ import numpy as np
 import torch
 from e3nn import o3
 from torch.nn import functional as F
-from torch_geometric.data import InMemoryDataset
 from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
-from aml.common.utils import compute_average_E0s, compute_neighbor_vecs
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
+from aml.data.dataset.base import BaseDataset
 from aml.nn.mace.blocks import (
     AtomicEnergiesBlock,
     EquivariantProductBasisBlock,
@@ -244,13 +244,15 @@ class MACE(BaseEnergyModel):
         self,
         energy_shift_mode: Literal["mean", "atomic_energies"] = "atomic_energies",
         energy_scale_mode: Literal["energy_std", "force_rms"] = "force_rms",
-        energy_mean: float | Literal["auto"] | None = None,
-        atomic_energies: dict[str, float] | Literal["auto"] | None = "auto",
-        energy_scale: float | dict[str, float] | Literal["auto"] | None = "auto",
+        energy_mean: Literal["auto"] | float | None = None,  # Must be per atom
+        atomic_energies: Literal["auto"] | dict[str, float] | None = "auto",
+        energy_scale: Literal["auto"] | float | dict[str, float] | None = "auto",
         trainable_scales: bool = True,
-        dataset: InMemoryDataset | None = None,
-        dataset_stride: int | None = None,
+        dataset: BaseDataset | None = None,
+        subset_size: int | float | None = None,
     ):
+        if subset_size is not None:
+            dataset = dataset.subset(subset_size)
         _no_dataset_msg = (
             "Dataset must be provided when initializing the model "
             "if atomic_energies or energy_scale is set to 'auto'."
@@ -266,7 +268,7 @@ class MACE(BaseEnergyModel):
         if atomic_energies == "auto":
             if dataset is None:
                 raise ValueError(_no_dataset_msg)
-            atomic_energies = compute_average_E0s(dataset, stride=dataset_stride)
+            atomic_energies = dataset.avg_atomic_property("energy")
         elif atomic_energies is None:
             atomic_energies = {s: 0.0 for s in self.species}
         elif isinstance(atomic_energies, dict):
@@ -281,9 +283,9 @@ class MACE(BaseEnergyModel):
             if dataset is None:
                 raise ValueError(_no_dataset_msg)
             if energy_scale_mode == "energy_std":
-                energy_scale = dataset._data.energy.std().item()
+                energy_scale = dataset.get_statistics("energy", per_atom=False, reduce="std")
             elif energy_scale_mode == "force_rms":
-                energy_scale = dataset._data.force.norm(dim=-1).std().item()
+                energy_scale = dataset.get_statistics("force", per_species=False, reduce="rms")
             else:
                 raise ValueError("Invalid value is given for energy_scale_mode. Must be 'energy_std' or 'force_rms'.")
         elif energy_scale is None:
