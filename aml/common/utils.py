@@ -2,6 +2,9 @@ import functools
 import inspect
 import json
 import warnings
+from collections.abc import Mapping, Sequence, Set
+from copy import deepcopy
+from numbers import Number
 from os import PathLike
 from pathlib import Path
 
@@ -11,6 +14,71 @@ import torch
 
 from aml.data import keys as K
 from aml.typing import DataDict, Tensor
+
+
+def _get_init_args(cls):
+    params = inspect.signature(cls.__init__).parameters
+    args = list(params.keys())[1:]
+    defaults = [params[arg].default for arg in args]
+    return args, defaults
+
+
+class Configurable:
+    supported_val_types = (str, bool, Number, type(None))
+
+    def get_config(self, param_name_map=None):
+        param_name_map = param_name_map or {}
+        args, _ = _get_init_args(self.__class__)
+
+        def recursive_as_dict(obj):
+            if isinstance(obj, Path):
+                return str(obj)
+            if isinstance(obj, str):
+                return obj
+            if isinstance(obj, (Sequence, Set)):
+                return type(obj)([recursive_as_dict(it) for it in obj])
+            if isinstance(obj, Mapping):
+                return type(obj)({kk: recursive_as_dict(vv) for kk, vv in obj.items()})
+            if hasattr(obj, "as_dict"):
+                return obj.as_dict()
+            if isinstance(obj, Configurable):
+                return obj.get_config()
+            return obj
+
+        config = {}
+        for arg in args:
+            argname = param_name_map.get(arg, arg)
+            try:
+                val = getattr(self, argname)
+            except AttributeError as e:
+                raise ValueError(f"Argument {arg} should be present as attribute.") from e
+            config[arg] = recursive_as_dict(val)
+
+        return config
+
+    @classmethod
+    def from_config(cls, config, actual_cls=None):
+        if actual_cls is None:
+            actual_cls = cls
+        config = deepcopy(config)
+        args, defaults = _get_init_args(actual_cls)
+        # Construct default config
+        sanitized_config = {k: v for k, v in zip(args, defaults, strict=True) if v is not inspect.Parameter.empty}
+        # Update the default config with the config file
+        for k, v in config.items():
+            if k in args:
+                sanitized_config[k] = v
+            else:
+                warnings.warn(f"Argument {k} is not used in {actual_cls.__name__}.__init__(). Ignored.", stacklevel=1)
+
+        init_signature = inspect.signature(actual_cls.__init__)
+        types = {k: p.annotation for k, p in init_signature.parameters.items() if p.annotation != inspect._empty}
+        # Convert the config to the correct type
+        for k, v in types.items():
+            if hasattr(v, "from_config"):
+                c = config[k]
+                sanitized_config[k] = v.from_config(c)
+        return actual_cls(**sanitized_config)
 
 
 def warn_unstable(cls_or_fn):
@@ -56,48 +124,6 @@ def log_and_print(contents: str, filepath: PathLike = None, end="\n"):
         with open(filepath, "a") as f:
             f.write(contents + end)
     print(contents, end=end)
-
-
-def compute_average_E0s(dataset, stride: int | None = None) -> dict[str, float]:
-    if stride is not None:
-        dataset = dataset[::stride]
-    # determine list of unique atomic numbers
-    species = np.unique(dataset._data.elems)
-    n_structures = len(dataset)
-    n_elems = len(species)
-    # compute average energy per atom for each element by lstsq
-    A = np.zeros((n_structures, n_elems))
-    B = np.zeros((n_structures,))
-
-    for i, data in enumerate(dataset):
-        B[i] = data.energy.squeeze().item()
-        for j, elem in enumerate(species):
-            A[i, j] = np.count_nonzero(data.elems == elem)
-    try:
-        E0s = np.linalg.lstsq(A, B, rcond=None)[0]
-        atomic_energies = {}
-        for i, elem in enumerate(species):
-            symbol = ase.data.chemical_symbols[elem]
-            atomic_energies[symbol] = E0s[i]
-    except np.linalg.LinAlgError:
-        atomic_energies = {}
-        for elem in species:
-            symbol = ase.data.chemical_symbols[elem]
-            atomic_energies[symbol] = 0.0
-    return atomic_energies
-
-
-def compute_force_rms_per_species(dataset, stride=None) -> dict[int, float]:
-    if stride is not None:
-        dataset = dataset[::stride]
-    # determine list of unique atomic numbers
-    species = torch.unique(dataset._data.elems)
-    force_rms = {}
-    for elem in species:
-        force_elem: Tensor = dataset._data.force[dataset._data.elems == elem]
-        symbol = ase.data.chemical_symbols[elem.item()]
-        force_rms[symbol] = force_elem.square().mean().sqrt().item()
-    return force_rms
 
 
 def remove_unused_kwargs(func, kwargs):
