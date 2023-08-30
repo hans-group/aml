@@ -1,9 +1,8 @@
-from copy import deepcopy
-
 import torch
 from ase import Atoms
 
-from aml.common.utils import compute_neighbor_vecs, load_config
+from aml.common.registry import registry
+from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.data.data_structure import AtomsGraph
 from aml.models.energy_models.base import BaseEnergyModel
@@ -61,6 +60,7 @@ def get_stress(data: DataDict, outputs: OutputDict, grad_vals: DataDict):
     return outputs
 
 
+@registry.register_model("interatomic_potential")
 class InterAtomicPotential(BaseModel):
     def __init__(
         self,
@@ -174,26 +174,6 @@ class InterAtomicPotential(BaseModel):
         data = data.to(device)
         outputs = self(data)
         return outputs
-
-    def get_config(self) -> dict:
-        config = {
-            "energy_model": self.energy_model.get_config(),
-            "compute_force": self.compute_force,
-            "compute_stress": self.compute_stress,
-            "compute_hessian": self.compute_hessian,
-        }
-        return config
-
-    @classmethod
-    def from_config(cls, config: dict | str) -> "InterAtomicPotential":
-        if not isinstance(config, dict):
-            config = load_config(config)
-        config = deepcopy(config)
-        energy_model = BaseEnergyModel.from_config(config["energy_model"])
-        compute_force = config.get("compute_force", True)
-        compute_stress = config.get("compute_stress", False)
-        compute_hessian = config.get("compute_hessian", False)
-        return cls(energy_model, compute_force, compute_stress, compute_hessian)
 
     @classmethod
     def load(cls, path: str) -> "InterAtomicPotential":

@@ -1,4 +1,3 @@
-import inspect
 import pickle
 import zlib
 from abc import ABC, abstractmethod
@@ -17,11 +16,11 @@ from tqdm import tqdm
 from typing_extensions import Self
 
 from aml.common.registry import registry
-from aml.common.utils import load_config
+from aml.common.utils import Configurable
 
 
 @registry.register_dataset("base_graph_dataset")
-class BaseDataset(Dataset, ABC):
+class BaseDataset(Dataset, Configurable, ABC):
     """Abstract base class for graph dataset."""
 
     def subset(self, size: int | float, seed: int = 0, return_idx=False) -> Self:
@@ -187,26 +186,23 @@ class BaseDataset(Dataset, ABC):
 
     def get_config(self):
         config = {}
-        config["@category"] = "dataset"
         config["@name"] = self.__class__.name
-        init_args = inspect.signature(self.__init__).parameters
-        config.update({k: getattr(self, k) for k in init_args if k != "self"})
+        config.update(super().get_config())
         return config
 
     @classmethod
-    def from_config(cls, config):
-        if not isinstance(config, dict):
-            config = load_config(config)
+    def from_config(cls, config: dict):
         config = deepcopy(config)
         name = config.pop("@name", None)
-        config.pop("@category", None)
         if cls.__name__ == "BaseDataset":
             if name is None:
                 raise ValueError("Cannot initialize BaseDataset from config. Please specify the name of the model.")
             model_class = registry.get_dataset_class(name)
         else:
+            if name is not None and hasattr(cls, "name") and cls.name != name:
+                raise ValueError("The name in the config is different from the class name.")
             model_class = cls
-        return model_class(**config)
+        return super().from_config(config, actual_cls=model_class)
 
 
 @registry.register_dataset("in_memory_dataset")
@@ -231,6 +227,13 @@ class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
         for k, v in config.items():
             setattr(dataset, k, v)
         return dataset
+
+    def get_config(self):
+        raise RuntimeError("InMemoryDataset cannot be serialized.")
+
+    @classmethod
+    def from_config(cls, config: dict):
+        raise RuntimeError("InMemoryDataset cannot be deserialized.")
 
     @property
     def avg_num_neighbors(self):

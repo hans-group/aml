@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Literal
@@ -8,14 +7,14 @@ import torch
 import torch.nn
 
 from aml.common.registry import registry
-from aml.common.utils import load_config
+from aml.common.utils import Configurable
 from aml.data.dataset import BaseDataset
 from aml.nn.scale import PerSpeciesScaleShift
 from aml.typing import DataDict, Tensor
 
 
 @registry.register_energy_model("base")
-class BaseEnergyModel(torch.nn.Module, ABC):
+class BaseEnergyModel(torch.nn.Module, Configurable, ABC):
     embedding_keys = []
 
     def __init__(self, species: list[str], cutoff: float = 5.0, *args, **kwargs):
@@ -124,31 +123,23 @@ class BaseEnergyModel(torch.nn.Module, ABC):
 
     def get_config(self):
         config = {}
-        config["@category"] = "energy_model"
         config["@name"] = self.__class__.name
-
-        params = inspect.signature(self.__class__.__init__).parameters
-        args = list(params.keys())[1:]
-        # Get values of all arguments passed to the constructor
-        values = [getattr(self, arg) for arg in args]
-        # Create a dictionary mapping argument names to values
-        config.update(dict(zip(args, values, strict=True)))
+        config.update(super().get_config())
         return config
 
     @classmethod
-    def from_config(cls, config: dict | str):
-        if not isinstance(config, dict):
-            config = load_config(config)
+    def from_config(cls, config: dict):
         config = deepcopy(config)
         name = config.pop("@name", None)
-        config.pop("@category", None)
         if cls.__name__ == "BaseEnergyModel":
             if name is None:
                 raise ValueError("Cannot initialize BaseEnergyModel from config. Please specify the name of the model.")
             model_class = registry.get_energy_model_class(name)
         else:
+            if name is not None and hasattr(cls, "name") and cls.name != name:
+                raise ValueError("The name in the config is different from the class name.")
             model_class = cls
-        return model_class(**config)
+        return super().from_config(config, actual_cls=model_class)
 
     @torch.jit.unused
     @property

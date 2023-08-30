@@ -1,6 +1,5 @@
 import shutil
 import warnings
-from collections import defaultdict
 from pathlib import Path
 from pprint import pprint
 from typing import Any, Literal
@@ -12,6 +11,7 @@ from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
 from torch_geometric.loader import DataLoader
 
 from aml.common.registry import registry
+from aml.common.utils import Configurable
 from aml.data.dataset import BaseDataset, InMemoryDataset
 from aml.models.iap import InterAtomicPotential
 from aml.train.callbacks import ExponentialMovingAverage
@@ -20,7 +20,7 @@ from aml.train.lightning_modules import PotentialTrainingModule
 ConfigDict = dict[str, Any]
 
 
-class PotentialTrainer:
+class PotentialTrainer(Configurable):
     def __init__(
         self,
         # Model
@@ -76,7 +76,7 @@ class PotentialTrainer:
         self._maybe_test_dataset = test_dataset
         self.val_size = val_size
         self.batch_size = batch_size
-        self.dataset_cache_dir = Path(dataset_cache_dir) if dataset_cache_dir is not None else None
+        self.dataset_cache_dir = Path(dataset_cache_dir).absolute() if dataset_cache_dir is not None else None
 
         self.energy_shift_mode = energy_shift_mode
         self.energy_scale_mode = energy_scale_mode
@@ -371,8 +371,10 @@ class PotentialTrainer:
         torch.save(predictions, self.experiment_dir / "predictions.pt")
         print(f"Predictions saved to {self.experiment_dir / 'predictions.pt'}")
 
-    @classmethod
-    def from_config(cls, config: dict) -> "PotentialTrainer":
-        _config = defaultdict(lambda: None)
-        _config.update(config)
-        return cls(**_config)
+    def get_config(self):
+        param_name_map = {
+            "model": "_maybe_model",
+            "train_dataset": "_maybe_train_dataset",
+            "test_dataset": "_maybe_test_dataset",
+        }
+        return super().get_config(param_name_map)
