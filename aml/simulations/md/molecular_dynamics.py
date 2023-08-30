@@ -89,9 +89,9 @@ class MolecularDynamics(Simulation):
     def _make_log_entry(self):
         log_entry = {
             "time [ps]": self.timestep * self._step / 1000,
-            "PE [eV/atom]": self.atoms.get_potential_energy().squeeze().item() / len(self.atoms),
-            "KE [eV/atom]": self.atoms.get_kinetic_energy().squeeze().item() / len(self.atoms),
-            "T [K]": self.atoms.get_kinetic_energy().squeeze().item() / len(self.atoms) / (1.5 * units.kB),
+            "PE [eV/atom]": self.atoms.get_potential_energy() / len(self.atoms),
+            "KE [eV/atom]": self.atoms.get_kinetic_energy() / len(self.atoms),
+            "T [K]": self.atoms.get_kinetic_energy() / len(self.atoms) / (1.5 * units.kB),
             "T(target) [K]": self.temperature.curr_temperature(),
         }
         if "npt" in self.ensemble:
