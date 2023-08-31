@@ -229,11 +229,15 @@ class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
         return dataset
 
     def get_config(self):
-        raise RuntimeError("InMemoryDataset cannot be serialized.")
+        if self.__class__.__name__ == "InMemoryDataset":
+            raise RuntimeError("InMemoryDataset cannot be serialized.")
+        return super().get_config()
 
     @classmethod
     def from_config(cls, config: dict):
-        raise RuntimeError("InMemoryDataset cannot be deserialized.")
+        if cls.__name__ == "InMemoryDataset":
+            raise RuntimeError("InMemoryDataset cannot be deserialized.")
+        return super().from_config(config)
 
     @property
     def avg_num_neighbors(self):
