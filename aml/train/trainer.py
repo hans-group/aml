@@ -1,13 +1,15 @@
 import shutil
 import warnings
+from copy import deepcopy
 from pathlib import Path
-from pprint import pprint
 from typing import Any, Literal
 
 import lightning as L
 import torch
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
+from rich.console import Console
+from rich.pretty import Pretty
 from torch_geometric.loader import DataLoader
 
 from aml.common.registry import registry
@@ -70,6 +72,7 @@ class PotentialTrainer(Configurable):
         restart_from_checkpoint: str | None = None,
         gradient_clip_val: float = 1.0,
         ema_decay: float | None = 0.999,
+        trainer_kwargs: ConfigDict | None = None,
     ):
         self._maybe_model = model
         self._maybe_train_dataset = train_dataset
@@ -119,6 +122,7 @@ class PotentialTrainer(Configurable):
         self.checkpoint_mode = checkpoint_mode
         self.checkpoint_save_last = checkpoint_save_last
         self.restart_from_checkpoint = restart_from_checkpoint
+        self.trainer_kwargs = trainer_kwargs
 
         self._datasets = None
 
@@ -135,18 +139,7 @@ class PotentialTrainer(Configurable):
 
         self.per_atom_loss_keys = ("energy",) if per_atom_energy_loss else ()
         self.loss_type = loss_type
-        self.metrics = metrics
-        if self.metrics is None:
-            self.metrics = ("energy_mae",)
-            if train_force:
-                self.metrics += ("force_mae",)
-            if train_stress:
-                self.metrics += ("stress_mae",)
-        else:
-            if train_force and "force_mae" not in self.metrics:
-                self.metrics += ("force_mae",)
-            if train_stress and "stress_mae" not in self.metrics:
-                self.metrics += ("stress_mae",)
+        self.metrics = metrics or _default_metrics(train_force, train_stress)
         self.optimizer = optimizer
         self.optimizer_config = {"lr": lr, "weight_decay": weight_decay}
         if optimizer_kwargs is not None:
@@ -166,6 +159,8 @@ class PotentialTrainer(Configurable):
 
         self.trainer = None
 
+        self.console = Console()
+
     def _build_model(self) -> InterAtomicPotential:
         if isinstance(self._maybe_model, dict):
             return InterAtomicPotential.from_config(self._maybe_model)
@@ -175,6 +170,8 @@ class PotentialTrainer(Configurable):
             raise ValueError("The argument model must be either a dict or an InterAtomicPotential instance.")
 
     def _build_datasets(self) -> tuple[BaseDataset, BaseDataset, BaseDataset | None]:
+        self.console.log("Building datasets...")
+
         def get_dataset_cls(maybe_dataset):
             if isinstance(maybe_dataset, BaseDataset):
                 return maybe_dataset.__class__
@@ -224,7 +221,6 @@ class PotentialTrainer(Configurable):
     @property
     def datasets(self) -> tuple[BaseDataset, BaseDataset, BaseDataset | None]:
         if self._datasets is None:
-            print("Building datasets...")
             self._datasets = self._build_datasets()
         return self._datasets
 
@@ -282,25 +278,54 @@ class PotentialTrainer(Configurable):
         return logger
 
     def train(self) -> None:
+        # Print info
+        self.console.log("========== Experiment Info ==========")
+        self.console.log(f"Project name: {self.project_name}")
+        self.console.log(f"Experiment name: {self.experiment_name}")
+        self.console.log(f"Run path: {self.experiment_dir}")
+        self.console.log(f"Device: {self.device}")
+
+        self.console.log("========== Dataset Info ==========")
+        self.console.log("Train dataset:")
+        cfg = get_config(self._maybe_train_dataset)
+        self.console.log(Pretty(cfg, indent_guides=True, indent_size=2, expand_all=True))
+        if self._maybe_test_dataset is not None:
+            self.console.log("Test dataset:")
+            cfg = get_config(self._maybe_test_dataset)
+            self.console.log(Pretty(cfg, indent_guides=True, indent_size=2, expand_all=True))
+        self.console.log("Building model...")
+
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         if self.dataset_cache_dir is not None:
             self.dataset_cache_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Training {self.experiment_name}...")
-        print(f"Experiment directory: {self.experiment_dir}")
-        print("Building model...")
         if isinstance(self._maybe_model, dict):
             equiv_models = ("mace", "nequip", "allegro")
             model_name = self._maybe_model["energy_model"]["@name"]
             avg_num_neighbors = self._maybe_model["energy_model"].get("avg_num_neighbors", None)
             if model_name in equiv_models and avg_num_neighbors is None:
-                print("Average number of neighbors are being computed...")
+                self.console.log("Average number of neighbors are being computed...")
                 train_dataset = self.datasets[0]
                 avg_num_neighbors = train_dataset.avg_num_neighbors
-                print(f"Average number of neighbors: {avg_num_neighbors}")
+                self.console.log(f"Average number of neighbors: {avg_num_neighbors}")
                 self._maybe_model["energy_model"]["avg_num_neighbors"] = avg_num_neighbors
         self.model = self._build_model()
-        print("Model info:")
-        pprint(self.model.get_config())
+
+        self.console.log("========== Model Info ==========")
+        model_config = get_config(self.model)
+        name = model_config["energy_model"].pop("@name", None)
+        species = model_config["energy_model"].pop("species", None)
+        self.console.log(f"Model name: {name}")
+        self.console.log(f"Species: {species}")
+        self.console.log("Model config:")
+        self.console.log(Pretty(model_config, indent_guides=True, indent_size=2, expand_all=True))
+
+        self.console.log("========== Training Info ==========")
+        self.console.log(f"Train force: {self.train_force}")
+        self.console.log(f"Train stress: {self.train_stress}")
+        self.console.log(f"Max epochs: {self.max_epochs}")
+        self.console.log(f"Loss function: {self.loss_type}")
+        self.console.log(f"Loss weights: {self.loss_weights}")
+
         if self.train_force:
             self.model.compute_force = True
         else:
@@ -328,13 +353,16 @@ class PotentialTrainer(Configurable):
             trainable_scales=self.trainable_scales,
             autoscale_subset_size=self.autoscale_subset_size,
         )
+        self.console.log("Initializing model scales...")
         self.training_module.initialize(self.datasets[0])
         train_loader, val_loader, _ = self._build_dataloaders()
         ckpt_path = self.restart_from_checkpoint
         if ckpt_path is not None:
             if not Path(ckpt_path).exists():
-                print("Checkpoint does not exist. Ignoring.")
+                self.console.log("Checkpoint does not exist. Ignoring.")
                 ckpt_path = None
+
+        self.console.log("Training start")
         self.trainer = L.Trainer(
             accelerator=self.device,
             devices=1,  # TODO: Add support for multiple GPUs
@@ -343,6 +371,7 @@ class PotentialTrainer(Configurable):
             callbacks=self._build_callbacks(),
             logger=self._build_logger(),
             log_every_n_steps=self.log_every_n_steps,
+            **(self.trainer_kwargs or {}),
         )
         self.trainer.fit(
             self.training_module,
@@ -355,13 +384,13 @@ class PotentialTrainer(Configurable):
             model_dir = Path("model")
             model_dir.mkdir(exist_ok=True, parents=True)
             saved_path = shutil.copy(best_model, model_dir)
-            print(f"Best model saved to {saved_path}")
+            self.console.log(f"Best model saved to {saved_path}")
 
     def test(self) -> None:
         if self.trainer is None:
             raise RuntimeError("Model has not been trained yet.")
         train_loader, val_loader, test_loader = self._build_dataloaders()
-        print("Evaluating model")
+        self.console.log("Evaluating model")
         predictions = {
             "train": self.training_module.predict(train_loader),
             "val": self.training_module.predict(val_loader),
@@ -378,3 +407,21 @@ class PotentialTrainer(Configurable):
             "test_dataset": "_maybe_test_dataset",
         }
         return super().get_config(param_name_map)
+
+
+def _default_metrics(train_force, train_stress):
+    metrics = ("energy_mae",)
+    if train_force:
+        metrics += ("force_mae",)
+    if train_stress:
+        metrics += ("stress_mae",)
+    return metrics
+
+
+def get_config(obj: ConfigDict | Configurable):
+    if isinstance(obj, Configurable):
+        return obj.get_config()
+    elif isinstance(obj, dict):
+        return deepcopy(obj)
+    else:
+        raise ValueError(f"Unsupported type {type(obj)}.")
