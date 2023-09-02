@@ -230,7 +230,7 @@ class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
 
     def get_config(self):
         if self.__class__.__name__ == "InMemoryDataset":
-            raise RuntimeError("InMemoryDataset cannot be serialized.")
+            return {}
         return super().get_config()
 
     @classmethod
