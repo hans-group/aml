@@ -38,16 +38,16 @@ def write_lmdb_dataset(
     """
     db = lmdb.open(path, map_size=map_size, subdir=False, meminit=False, map_async=True)
 
-    for i, data in enumerate(data_iter):
-        pkl = pickle.dumps(data.clone().contiguous())
-        if compress:
-            pkl = zlib.compress(pkl)
-        txn = db.begin(write=True)
-        txn.put(str(i).encode("ascii"), pkl)
-        txn.commit()
+    with db.begin(write=True) as txn:
+        for i, data in enumerate(data_iter):
+            pkl = pickle.dumps(data.clone().contiguous())
+            if compress:
+                pkl = zlib.compress(pkl)
+
+            txn.put(str(i).encode("ascii"), pkl)
     if metadata is not None:
-        txn = db.begin(write=True)
-        txn.put("metadata".encode("ascii"), pickle.dumps(metadata))
-        txn.commit()
+        with db.begin(write=True) as txn:
+            txn.put("metadata".encode("ascii"), pickle.dumps(metadata))
+
     db.sync()
     db.close()
