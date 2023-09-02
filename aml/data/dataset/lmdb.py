@@ -83,5 +83,6 @@ class LMDBDataset(BaseDataset):
     @property
     def metadata(self):
         txn = self.envs[0].begin()
-        metadata = pickle.loads(txn.get("metadata".encode("ascii")))
-        return metadata
+        metadata = txn.get("metadata".encode("ascii"))
+        if metadata is not None:
+            return pickle.loads(metadata)

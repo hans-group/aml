@@ -1,11 +1,8 @@
-import pickle
-import zlib
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Sequence, Tuple
 
 import ase.data
-import lmdb
 import numpy as np
 import torch
 from torch_geometric.data import Dataset
@@ -17,6 +14,7 @@ from typing_extensions import Self
 
 from aml.common.registry import registry
 from aml.common.utils import Configurable
+from aml.data.utils import write_lmdb_dataset
 
 
 @registry.register_dataset("base_graph_dataset")
@@ -73,23 +71,10 @@ class BaseDataset(Dataset, Configurable, ABC):
             prog_bar (bool, optional): Whether to show progress bar. Defaults to True.
             compress (bool, optional): Whether to compress data by zlib. Defaults to False.
         """
-        db = lmdb.open(path, map_size=map_size, subdir=False, meminit=False, map_async=True)
-        dataiter = tqdm(self, total=len(self)) if prog_bar else self
-        for i, data in enumerate(dataiter):
-            pkl = pickle.dumps(data.clone().contiguous())
-            if compress:
-                pkl = zlib.compress(pkl)
-            txn = db.begin(write=True)
-            txn.put(str(i).encode("ascii"), pkl)
-            txn.commit()
-        # Write metadata
+        data_iter = tqdm(self, total=len(self)) if prog_bar else self
         dataset_config = self.get_config()
         metadata = {"parent_dataset": dataset_config, "map_size": map_size, "compress": compress}
-        txn = db.begin(write=True)
-        txn.put("metadata".encode("ascii"), pickle.dumps(metadata))
-        txn.commit()
-        db.sync()
-        db.close()
+        write_lmdb_dataset(data_iter, path, map_size=map_size, compress=compress, metadata=metadata)
 
     @property
     @abstractmethod
