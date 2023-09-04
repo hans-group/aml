@@ -19,7 +19,7 @@ class NormalModes:
     and modified to work at general situations.
     """
 
-    def __init__(self, atoms: Atoms, hessian: np.ndarray | None = None):
+    def __init__(self, atoms: Atoms, hessian: np.ndarray | None = None, hmass=None):
         """Allows to do normal mode-related operations.
 
         Args:
@@ -33,7 +33,12 @@ class NormalModes:
             self.calculate_hessian()
         self.num_at = len(self.atoms)
         self.num_nm = self.num_at * 3
-        self.inverse_m = np.repeat(self.atoms.get_masses() ** -0.5, 3)
+        masses = self.atoms.get_masses()
+        if hmass is not None:
+            for i in range(len(atoms)):
+                if atoms[i].symbol == "H":
+                    masses[i] = hmass
+        self.inverse_m = np.repeat(masses**-0.5, 3)
 
         # dynamical matrix's eigenvalues in eV/Å^2/amu
         self.eigenvalues = None
