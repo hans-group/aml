@@ -1,6 +1,6 @@
 import pickle
-from typing import TypeVar
 import zlib
+from typing import TypeVar
 
 import lmdb
 
