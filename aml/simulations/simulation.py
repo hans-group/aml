@@ -18,6 +18,7 @@ class Simulation(ABC):
         trajectory: PathLike | None = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
+        store_trajectory: bool = False,
     ):
         self.atoms = atoms
         if atoms.calc is None:
@@ -29,6 +30,7 @@ class Simulation(ABC):
         self.log_interval = log_interval
         self.trajectory = trajectory
         self.trajectory_interval = trajectory_interval
+        self.store_trajectory = store_trajectory
         if trajectory is not None:
             if str(trajectory).endswith(".xyz"):
                 self.traj_writer = XYZTrajectoryWriter(trajectory, append_trajectory)
@@ -39,6 +41,7 @@ class Simulation(ABC):
         else:
             self.traj_writer = None
         self._step = 1
+        self.traj = []
 
     @abstractmethod
     def _make_log_entry(self) -> dict[str, str | int | float | bool]:
@@ -68,6 +71,11 @@ class Simulation(ABC):
             if self.trajectory is not None and n % self.trajectory_interval == 0:
                 with self.traj_writer as w:
                     w.write(self.atoms)
+            if self.store_trajectory and n % self.trajectory_interval == 0:
+                atoms = self.atoms.copy()
+                calc = self.atoms.calc
+                atoms.calc = calc
+                self.traj.append(self.atoms.copy())
             if stop:
                 break
             self._step += 1

@@ -40,6 +40,7 @@ class MolecularDynamics(Simulation):
         trajectory: Optional[PathLike] = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
+        store_trajectory: bool = False,
     ):
         super().__init__(
             atoms,
@@ -48,6 +49,7 @@ class MolecularDynamics(Simulation):
             trajectory,
             trajectory_interval,
             append_trajectory,
+            store_trajectory,
         )
         self.timestep = timestep
         if isinstance(temperature, (float, int)):
