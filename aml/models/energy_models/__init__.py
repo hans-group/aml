@@ -1,6 +1,7 @@
 from .allegro import Allegro
 from .base import BaseEnergyModel
 from .bpnn import BPNN
+from .equivariant_transformer import EquivariantTransformer
 from .gemnet import GemNetT
 from .mace import MACE
 from .nequip import NequIP
@@ -11,6 +12,7 @@ __all__ = [
     "Allegro",
     "BaseEnergyModel",
     "BPNN",
+    "EquivariantTransformer",
     "GemNetT",
     "MACE",
     "NequIP",
