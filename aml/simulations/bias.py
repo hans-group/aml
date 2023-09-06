@@ -19,6 +19,7 @@ class BiasPotential(ABC):
         E_bias, _ = self._get_bias_energy_and_force(atoms)
         return E_bias
 
+    @abstractmethod
     def adjust_positions(self, atoms, new):
         pass
 
@@ -36,31 +37,37 @@ class RMSDBiasPotential(BiasPotential):
             kappa: damping factor
         """
         self.reference_points = reference_points
-        self.step_count = np.zeros(len(reference_points))
+        self._step_offsets = np.zeros(len(reference_points), dtype=np.int64)
         self.k = k
         self.alpha = alpha
         self.kappa = kappa
 
+        self._dynamics_step = 1
+
+    def set_step(self, step):
+        self._dynamics_step = step
+
     def _update_reference(self, R):
         self.reference_points.append(R)
-        self.step_count += 1
-        self.step_count = np.append(self.step_count, 0)
+        self._step_offsets = np.append(self._step_offsets, self._dynamics_step - 1)
 
     def _remove_oldest_reference(self):
         self.reference_points.pop(0)
-        self.step_count = np.delete(self.step_count, 0)
+        self._step_offsets = np.delete(self._step_offsets, 0)
 
     def _get_bias_energy_and_force(self, atoms):
         if not self.reference_points:
             return 0, 0
         R = atoms.get_positions()
-        E = 0
+
+        E = 0.0
         F = np.zeros_like(R)
         k = self.k * R.shape[0]  # k is per atom
-        for atoms_ref, step in zip(self.reference_points, self.step_count, strict=True):
+        step_count = self._dynamics_step - self._step_offsets
+        for atoms_ref, step in zip(self.reference_points, step_count, strict=True):
             R_ref = atoms_ref.get_positions()
             rmsd, rmsd_grad, *_ = _ext.compute_minimum_rmsd(R, R_ref, True)
-            damping_factor = 2 / (1 + np.exp(-self.kappa * step)) - 1
+            damping_factor = 2 / (1 + np.exp(-self.kappa * (step - 1))) - 1
             if damping_factor > 0:
                 dE = k * np.exp(-self.alpha * rmsd) * damping_factor
                 dF = -k * np.exp(-self.alpha * rmsd) * (-self.alpha * rmsd_grad) * damping_factor
@@ -72,3 +79,6 @@ class RMSDBiasPotential(BiasPotential):
                 E += dE
                 F += dF
         return E, F
+
+    def adjust_positions(self, atoms, new):
+        pass

@@ -23,7 +23,7 @@ class RMSDMetaDynamics(MolecularDynamics):
         store_trajectory: bool = False,
         bias_scale: float = 0.5,  # eV/atom
         bias_width: float = 1.5,  # Angstrom
-        bias_damping_fractor: float = 10.0,
+        bias_damping_fractor: float = 0.03,
         bias_update_frequency: int = 1000,
         maximum_num_bias: int = 10,
         verbose: bool = False,
@@ -68,6 +68,7 @@ class RMSDMetaDynamics(MolecularDynamics):
             if len(self.bias_potential.reference_points) > self.maximum_num_bias:
                 self.bias_potential._remove_oldest_reference()
         self.dyn.run(1)
+        self.bias_potential.set_step(self._step)
         if self.ensemble != "nve":
             self.dyn.set_temperature(temperature_K=self.temperature())
 
