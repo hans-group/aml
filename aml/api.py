@@ -57,9 +57,9 @@ def compile_iap(
     if energy_model.name == "gemnet_t":
         raise ValueError("Gemnet is not supported by torch.jit.script")
     if energy_model.name in ("mace", "allegro", "nequip"):
-        compiled_model = e3nn_script(energy_model)
+        compiled_model = e3nn_script(model)
     else:
-        compiled_model = torch.jit.script(energy_model)
+        compiled_model = torch.jit.script(model)
     if save_path is not None:
         torch.jit.save(compiled_model, save_path)
     return compiled_model

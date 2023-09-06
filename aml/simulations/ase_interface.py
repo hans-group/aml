@@ -53,7 +53,7 @@ class AMLCalculator(Calculator):  # noqa: F821
         self.model.compute_force = compute_force
         self.model.compute_stress = compute_stress
         self.model.compute_hessian = compute_hessian
-        self.r_cut = model.energy_model.cutoff
+        self.r_cut = model.cutoff
 
         if neighborlist_backend not in ["ase", "matscipy"]:
             raise ValueError(f"Invalid neighborlist_backend: '{neighborlist_backend}'")
