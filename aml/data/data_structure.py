@@ -75,7 +75,7 @@ class AtomsGraph(Data):
         if elems is not None:
             self.n_atoms = torch.tensor([elems.size(0)], dtype=torch.long)
 
-        if pos is not None:
+        if pos is not None and elems is not None:
             assert pos.shape[0] == elems.shape[0], "Number of atoms and number of positions must be same."
         if cell is None and pos is not None:
             self.cell = torch.zeros((1, 3, 3), dtype=_default_dtype)
@@ -101,6 +101,7 @@ class AtomsGraph(Data):
         read_properties: bool = True,
         add_batch: bool = True,
         neighborlist_backend: Union[str, NeighborListBuilder] = "ase",
+        device: str | torch.device | None = None,
         **kwargs,
     ):
         """Create AtomsGraph from ASE Atoms object.
@@ -122,34 +123,34 @@ class AtomsGraph(Data):
         Returns:
             _type_: _description_
         """
-
-        elems = torch.tensor(atoms.numbers, dtype=torch.long)
-        pos = torch.tensor(atoms.positions, dtype=_default_dtype)
-        cell = cls.resolve_cell(atoms)
-        n_atoms = torch.tensor([len(atoms)], dtype=torch.long)
+        device = "cpu" if device is None else device
+        elems = torch.tensor(atoms.numbers, dtype=torch.long, device=device)
+        pos = torch.tensor(atoms.positions, dtype=_default_dtype, device=device)
+        cell = cls.resolve_cell(atoms).to(device)
+        n_atoms = torch.tensor([len(atoms)], dtype=torch.long, device=device)
         if read_properties:
             if energy is None:
                 try:
                     energy = atoms.get_potential_energy()
-                    energy = torch.as_tensor(energy, dtype=_default_dtype)
+                    energy = torch.as_tensor(energy, dtype=_default_dtype, device=device)
                 except RuntimeError:
                     pass
             if force is None:
                 try:
                     force = atoms.get_forces()
-                    force = torch.as_tensor(force, dtype=_default_dtype)
+                    force = torch.as_tensor(force, dtype=_default_dtype, device=device)
                 except RuntimeError:
                     pass
             if stress is None:
                 try:
                     stress = atoms.get_stress(voigt=False)
-                    stress = torch.as_tensor(np.array([stress]), dtype=_default_dtype)
+                    stress = torch.as_tensor(np.array([stress]), dtype=_default_dtype, device=device)
                 except RuntimeError:
                     pass
             else:
                 if stress.shape == (6,):
                     stress = voigt_6_to_full_3x3_stress(stress)
-                stress = torch.as_tensor(stress, dtype=_default_dtype)
+                stress = torch.as_tensor(stress, dtype=_default_dtype, device=device)
         atoms_graph = cls(
             elems, pos, cell, None, None, energy, force, stress, n_atoms=n_atoms, add_batch=add_batch, **kwargs
         )
