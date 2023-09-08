@@ -7,6 +7,7 @@ import matscipy.neighbours
 import numpy as np
 import torch
 from torch import Tensor
+from torch_cluster.radius import radius, radius_graph
 from torch_geometric.data import Data
 
 
@@ -50,17 +51,18 @@ class ASENeighborListBuilder(NeighborListBuilder):
             pbc = np.array([False, False, False])
         else:
             pbc = np.array([True, True, True])
-        pos = atoms_graph.pos.numpy().astype(np.float64)
-        cell = atoms_graph.cell.squeeze().numpy().astype(np.float64)
-        elems = atoms_graph.elems.numpy().astype(np.int32)
+        device = atoms_graph.pos.device
+        pos = atoms_graph.pos.cpu().numpy().astype(np.float64)
+        cell = atoms_graph.cell.squeeze().cpu().numpy().astype(np.float64)
+        elems = atoms_graph.elems.cpu().numpy().astype(np.int32)
 
         center_idx, neighbor_idx, offset = ase.neighborlist.primitive_neighbor_list(
             "ijS", pbc, cell, pos, self.cutoff, elems, self_interaction=self.self_interaction
         )
         return NeighborList(
-            center_idx=torch.LongTensor(center_idx),
-            neighbor_idx=torch.LongTensor(neighbor_idx),
-            offset=torch.as_tensor(offset, dtype=torch.float),
+            center_idx=torch.LongTensor(center_idx).to(device),
+            neighbor_idx=torch.LongTensor(neighbor_idx).to(device),
+            offset=torch.as_tensor(offset, dtype=torch.float).to(device),
         )
 
 
@@ -70,11 +72,11 @@ class MatscipyNeighborListBuilder(NeighborListBuilder):
             pbc = np.array([False, False, False])
         else:
             pbc = np.array([True, True, True])
-
+        device = atoms_graph.pos.device
         # matscipy.neighbours.neighbour_list fails for non-periodic systems
-        pos = atoms_graph.pos.numpy().astype(np.float64)
-        cell = atoms_graph.cell.squeeze().numpy().astype(np.float64)
-        elems = atoms_graph.elems.numpy().astype(np.int32)
+        pos = atoms_graph.pos.cpu().numpy().astype(np.float64)
+        cell = atoms_graph.cell.squeeze().cpu().numpy().astype(np.float64)
+        elems = atoms_graph.elems.cpu().numpy().astype(np.int32)
         if not pbc.all():
             # put atoms in a box with periodic boundary conditions
             rmin = np.min(pos, axis=0)
@@ -105,13 +107,49 @@ class MatscipyNeighborListBuilder(NeighborListBuilder):
             offset = offset[idx]
 
         return NeighborList(
-            center_idx=torch.LongTensor(center_idx),
-            neighbor_idx=torch.LongTensor(neighbor_idx),
-            offset=torch.as_tensor(offset, dtype=torch.float),
+            center_idx=torch.LongTensor(center_idx).to(device),
+            neighbor_idx=torch.LongTensor(neighbor_idx).to(device),
+            offset=torch.as_tensor(offset, dtype=torch.float).to(device),
         )
 
 
-_neighborlistbuilder_cls_map = {"ase": ASENeighborListBuilder, "matscipy": MatscipyNeighborListBuilder}
+class TorchNeighborListBuilder(NeighborListBuilder):
+    def build(self, atoms_graph: Data) -> NeighborList:
+        max_neighbors = 64
+        device = atoms_graph.pos.device
+        pbc = atoms_graph.volume() != 0
+        if "batch" in atoms_graph:
+            batch = atoms_graph.batch
+        else:
+            batch = torch.zeros_like(atoms_graph.elems, device=device, dtype=torch.long)
+        if not pbc:
+            edge_index = radius_graph(atoms_graph.pos, self.cutoff, batch=batch, max_num_neighbors=max_neighbors)
+            idx_j, idx_i = edge_index[1], edge_index[0]
+            offset = torch.zeros_like(atoms_graph.pos, device=device, dtype=torch.float)
+            return NeighborList(center_idx=idx_i, neighbor_idx=idx_j, offset=offset)
+        # When pbc=True, make supercell
+        pos = atoms_graph.pos
+        cell = atoms_graph.cell.squeeze()
+        num_atoms = pos.size(0)
+
+        offset = torch.tensor([0.0, 1.0, -1.0], device=pos.device, dtype=torch.float32)
+        offsets = torch.cartesian_prod(offset, offset, offset).repeat_interleave(len(pos), dim=0)
+        pos_333 = offsets @ cell + pos.repeat(27, 1)
+
+        edge_index = radius(pos_333, pos_333[:num_atoms], self.cutoff, max_num_neighbors=max_neighbors)
+        mask = edge_index[1] != edge_index[0]
+        edge_index = edge_index[:, mask]
+        edge_shift = offsets[edge_index[1]]
+        edge_index[1] = edge_index[1] % num_atoms
+
+        return NeighborList(center_idx=edge_index[0], neighbor_idx=edge_index[1], offset=edge_shift)
+
+
+_neighborlistbuilder_cls_map = {
+    "ase": ASENeighborListBuilder,
+    "matscipy": MatscipyNeighborListBuilder,
+    "torch": TorchNeighborListBuilder,
+}
 
 
 def resolve_neighborlist_builder(neighborlist_backend: Union[str, object]) -> object:
