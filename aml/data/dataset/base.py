@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Sequence, Tuple
+from typing import Iterable, Literal, Tuple
 
 import ase.data
 import numpy as np
@@ -21,16 +21,34 @@ from aml.data.utils import write_lmdb_dataset
 class BaseDataset(Dataset, Configurable, ABC):
     """Abstract base class for graph dataset."""
 
-    def subset(self, size: int | float, seed: int = 0, return_idx=False) -> Self:
-        """Create a subset of the dataset with `n` elements."""
+    def subset(self, size: int | float, seed: int = 0, return_idx: bool = False) -> Self:
+        """Create a subset of the dataset with specified size.
+
+        Args:
+            size (int | float): Size of the subset. If float, it is interpreted as the fraction of the dataset.
+            seed (int, optional): Random seed. Defaults to 0.
+            return_idx (bool, optional): Whether to return indices of the subset. Defaults to False.
+
+        Returns:
+            Self: Subset of the dataset.
+        """
         size = _determine_size(self, size)
         indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
         if return_idx:
             return self[indices[:size]], indices[:size]
         return self[indices[:size]]
 
-    def split(self, size: int | float, seed: int = 0, return_idx=False) -> Tuple[Self, Self]:
-        """Split the dataset into two subsets of `n` and `len(self) - n` elements."""
+    def split(self, size: int | float, seed: int = 0, return_idx: bool = False) -> Tuple[Self, Self]:
+        """Split the dataset into two subsets of `size` and `len(self) - size` elements.
+
+        Args:
+            size (int | float): Size of the first subset. If float, it is interpreted as the fraction of the dataset.
+            seed (int, optional): Random seed. Defaults to 0.
+            return_idx (bool, optional): Whether to return indices of the subsets. Defaults to False.
+
+        Returns:
+            Tuple[Self, Self]: Two subsets of the dataset.
+        """
         size = _determine_size(self, size)
         indices = torch.randperm(len(self), generator=torch.Generator().manual_seed(seed))
         if return_idx:
@@ -42,8 +60,22 @@ class BaseDataset(Dataset, Configurable, ABC):
         train_size: int | float,
         val_size: int | float,
         seed: int = 0,
-        return_idx=False,
+        return_idx: bool = False,
     ) -> Tuple[Self, Self, Self]:
+        """Split the dataset into three subsets of `train_size`, `val_size`, and `len(self) - train_size - val_size`
+        elements.
+
+        Args:
+            train_size (int | float): Size of the training subset. If float, it is interpreted as the fraction of the
+                dataset.
+            val_size (int | float): Size of the validation subset. If float, it is interpreted as the fraction of the
+                dataset.
+            seed (int, optional): Random seed. Defaults to 0.
+            return_idx (bool, optional): Whether to return indices of the subsets. Defaults to False.
+
+        Returns:
+            Tuple[Self, Self, Self]: Three subsets of the dataset.
+        """
         train_size = _determine_size(self, train_size)
         val_size = _determine_size(self, val_size)
 
@@ -78,8 +110,12 @@ class BaseDataset(Dataset, Configurable, ABC):
 
     @property
     @abstractmethod
-    def avg_num_neighbors(self):
-        """Compute average number of neighbors per atom."""
+    def avg_num_neighbors(self) -> float:
+        """Compute average number of neighbors per atom.
+
+        Returns:
+            float: Average number of neighbors per atom.
+        """
 
     # Statistics
     def avg_atomic_property(self, key: str) -> dict[str, float]:
@@ -87,15 +123,10 @@ class BaseDataset(Dataset, Configurable, ABC):
         Only makes sense if the property is extensive scalar property. ex) total energy
 
         Args:
-            dataset (GraphDatasetMixin):
-            key (str): _description_
-
-        Raises:
-            ValueError: _description_
-            ValueError: _description_
+            key (str): Key of the property.
 
         Returns:
-            dict[str, float]: _description_
+            dict[str, float]: Average atomic property per species.
         """
         sample = self[0]
         _check_contain_key(sample, "elems")
@@ -128,7 +159,29 @@ class BaseDataset(Dataset, Configurable, ABC):
                 atomic_properties[symbol] = 0.0
         return atomic_properties
 
-    def get_statistics(self, key, per_atom=False, per_species=False, reduce="mean"):
+    def get_statistics(
+        self,
+        key: str,
+        per_atom: bool = False,
+        per_species: bool = False,
+        reduce: Literal["mean", "std", "rms"] = "mean",
+    ) -> dict[str, float] | float:
+        """
+        Compute statistics of the required property.
+        The parameter `per_atom` and `per_species` are mutually exclusive, so only one of them can be True.
+
+        Args:
+            key (str): Key of the property.
+            per_atom (bool, optional): Whether to compute statistics per atom. Defaults to False.
+            per_species (bool, optional): Whether to compute statistics per species. Defaults to False.
+            reduce (Literal["mean", "std", "rms"], optional): Type of reduction. Defaults to "mean".
+
+        Raises:
+            ValueError: If `per_atom` and `per_species` are True at the same time.
+
+        Returns:
+            dict[str, float] | float: Statistics of the property.
+        """
         if reduce == "mean":
             reduce_fn = torch.mean
         elif reduce == "std":
@@ -169,14 +222,27 @@ class BaseDataset(Dataset, Configurable, ABC):
             values = torch.cat(values, dim=0)
             return reduce_fn(values)
 
-    def get_config(self):
+    def get_config(self) -> dict:
+        """Get configuration of the dataset.
+        Dataset additionally stores the name of the class,
+        so that it can be retrieved from registry.
+        """
         config = {}
         config["@name"] = self.__class__.name
         config.update(super().get_config())
         return config
 
     @classmethod
-    def from_config(cls, config: dict):
+    def from_config(cls, config: dict) -> Self:
+        """Initialize dataset from configuration.
+
+        Args:
+            config (dict): Configuration of the dataset.
+
+        Returns:
+            Self: Initialized dataset.
+        """
+
         config = deepcopy(config)
         name = config.pop("@name", None)
         if cls.__name__ == "BaseDataset":
@@ -192,7 +258,15 @@ class BaseDataset(Dataset, Configurable, ABC):
 
 @registry.register_dataset("in_memory_dataset")
 class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
-    def __init__(self, data: IterDataPipe | Sequence[BaseData] = None):
+    """In-memory dataset which fits to the memory.
+    The only required parameter is `data`, which is a iterable of `BaseData` objects.
+    Note that InMemoryDataset itself cannot be initialized from config.
+
+    Args:
+        data (Iterable[BaseData]): Iterable of `BaseData` objects.
+    """
+
+    def __init__(self, data: IterDataPipe | Iterable[BaseData] | None = None):
         PyGInMemoryDataset.__init__(self)
         if data is None:
             self.data, self.slices = None, None
@@ -200,12 +274,25 @@ class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
             data = [d for d in data]
             self.data, self.slices = self.collate(data)
 
-    def save(self, path):
+    def save(self, path: str):
+        """Save dataset to the file.
+
+        Args:
+            path (str): Path to the file.
+        """
         config = self.get_config()
         torch.save((config, self._data, self.slices), path)
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path: str) -> Self:
+        """Load dataset from the file.
+
+        Args:
+            path (str): Path to the file.
+
+        Returns:
+            Self: Loaded dataset.
+        """
         config, data, slices = torch.load(path)
         dataset = cls()
         dataset.data, dataset.slices = data, slices
@@ -229,7 +316,7 @@ class InMemoryDataset(BaseDataset, PyGInMemoryDataset):
         return self._data.edge_index.size(1) / self._data.pos.size(0)
 
 
-def _determine_size(dataset, size):
+def _determine_size(dataset: BaseDataset, size: int | float) -> int:
     if isinstance(size, float):
         size = int(len(dataset) * size)
     elif isinstance(size, int):
@@ -241,18 +328,18 @@ def _determine_size(dataset, size):
     return size
 
 
-def _check_scalar_key(data, key):
+def _check_scalar_key(data: BaseData, key: str):
     sample_value = data[key].squeeze()
     if not sample_value.ndim == 0:
         raise ValueError(f"Value of '{key}' must be a scalar.")
 
 
-def _check_atomic_property_key(data, key):
+def _check_atomic_property_key(data: BaseData, key: str):
     sample_value = data[key]
     if sample_value.size(0) != data.num_nodes:
         raise ValueError(f"Value of '{key}' must have the same length as the number of nodes.")
 
 
-def _check_contain_key(data, key):
+def _check_contain_key(data: BaseData, key: str):
     if key not in data:
         raise ValueError(f"Data must contain '{key}' field.")
