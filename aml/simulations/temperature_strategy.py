@@ -55,7 +55,7 @@ class ConstantTemperature(TemperatureStrategy):
         n_steps (Optional[int], optional): Number of steps. Defaults to None.
     """
 
-    def __init__(self, temperature: float, n_steps: Optional[float] = None):
+    def __init__(self, temperature: float, n_steps: Optional[int] = None):
         super().__init__(n_steps)
         self.temperature = temperature
 
