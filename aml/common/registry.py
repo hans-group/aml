@@ -27,6 +27,14 @@ import inflection
 
 
 def camelcase_to_snakecase(name: str) -> str:
+    """Convert camel case to snake case
+
+    Args:
+        name (str): Name to convert
+
+    Returns:
+        str: Converted name
+    """
     # Do not add underscore if the last character is single upper cases
     # e.g. "AdamW" -> "adamw"
     if name[-1].isupper() and not name[-2].isupper():
@@ -40,6 +48,16 @@ def _normalize_str(s: str) -> str:
 
 
 def _find_match(query: str, choices: Iterable[str]) -> Optional[str]:
+    """Find the best match for query in choices.
+    The stringss are normalized by removing all underscores and hyphens.
+
+    Args:
+        query (str): Query string
+        choices (Iterable[str]): Iterable of choices
+
+    Returns:
+        Optional[str]: Best match if found else None
+    """
     for choice in choices:
         if _normalize_str(query) == _normalize_str(choice):
             if query != choice:
@@ -151,7 +169,7 @@ def _find_all_pl_loggers():
 
 class Registry:
     r"""Class for registry object which acts as central source of truth
-    for MMF
+    for AML.
     """
     mapping = {
         # Mappings of builder name to their respective classes
