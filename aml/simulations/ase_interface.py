@@ -31,11 +31,8 @@ class AMLCalculator(Calculator):  # noqa: F821
     def __init__(
         self,
         model: InterAtomicPotential,
-        compute_force: bool = True,
-        compute_stress: bool = False,
-        compute_hessian: bool = False,
         device: str | None = None,
-        neighborlist_backend: Literal["ase", "matscipy"] = "ase",
+        neighborlist_backend: Literal["ase", "matscipy", "torch"] = "ase",
         neighborlist_skin: float = 0.0,  # tolerance os pos change for neighborlist update
         **kwargs,
     ):
@@ -47,15 +44,12 @@ class AMLCalculator(Calculator):  # noqa: F821
         else:
             self.device = next(self.model.parameters()).device
         self.model.eval()
-        self._compute_force = compute_force
-        self._compute_stress = compute_stress
-        self._compute_hessian = compute_hessian
-        self.model.compute_force = compute_force
-        self.model.compute_stress = compute_stress
-        self.model.compute_hessian = compute_hessian
+        self._compute_force = self.model.compute_force
+        self._compute_stress = self.model.compute_stress
+        self._compute_hessian = self.model.compute_hessian
         self.r_cut = model.cutoff
 
-        if neighborlist_backend not in ["ase", "matscipy"]:
+        if neighborlist_backend not in ["ase", "matscipy", "torch"]:
             raise ValueError(f"Invalid neighborlist_backend: '{neighborlist_backend}'")
 
         self.neighborlist_backend = neighborlist_backend
