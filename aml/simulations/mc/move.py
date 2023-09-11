@@ -88,3 +88,26 @@ class NeighborSwap(RandomMove):
         atoms[idx_i].number = elem_j
         atoms[idx_j].number = elem_i
         return atoms
+
+
+class Remove(RandomMove):
+    def move(self, atoms: Atoms) -> Atoms:
+        movable_idx = self._get_movable_idx(atoms)
+        if len(movable_idx) == 0:
+            raise RuntimeError("No move available")
+        idx_i = np.random.choice(movable_idx)
+
+        species = atoms.get_atomic_numbers()
+        elem_i = species[idx_i]
+        elem_mask = species[movable_idx] != elem_i  # Mask for different species
+        candidate_idx = movable_idx[elem_mask]
+
+        if len(candidate_idx) == 0:
+            raise RuntimeError("No move available")
+        idx_j = np.random.choice(candidate_idx)
+        elem_j = species[idx_j]
+
+        # Do swap
+        atoms[idx_i].number = elem_j
+        atoms[idx_j].number = elem_i
+        return atoms
