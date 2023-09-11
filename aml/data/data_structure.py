@@ -19,6 +19,7 @@ _default_dtype = torch.get_default_dtype()
 
 class AtomsGraph(Data):
     """Basic graph representation of an atomic system.
+    The arguments below are all optional, but commonly used.
 
     Args:
         elems (Tensor): 1D tensor of atomic numbers.
@@ -29,6 +30,7 @@ class AtomsGraph(Data):
             If this means neighbor indices, 0th row is neighbor and 1st row is center.
             This is because message passing occurs from neighbors to centers.
         edge_shift (OptTensor, optional): Optional shift vectors when creating neighbor list.
+            This is non-zero when PBC is applied.
             Defaults to None.
         energy (OptTensor, optional): Energy of the system. Defaults to None.
         force (OptTensor, optional): Force on each atom. Defaults to None.
@@ -105,6 +107,7 @@ class AtomsGraph(Data):
         **kwargs,
     ):
         """Create AtomsGraph from ASE Atoms object.
+        Optionally, neighborlist can be built automatically.
 
         Args:
             atoms (Atoms): An ASE Atoms object.
@@ -117,11 +120,14 @@ class AtomsGraph(Data):
                     atoms.calc if available. Defaults to None.
             add_batch (bool, optional): Whether to add batch index as attribute or not. Defaults to True.
             neighborlist_backend (Union[str, NeighborListBuilder], optional): The backend for building neighborlist.
-                    Accepts `str` or `NeighborListBuilder` class. See `neural_iap_data.neighborlist.py`.
+                    Accepts `str` or `NeighborListBuilder` class. See `aml.data.neighbor_list.py`.
+                    Usually "torch" is the fastest, but the speed is simliary to "matscipy" when PBC is used.
+                    "matscipy" is also fast, but it uses minimal image convention,
+                        so cannot be used for small cell.
+                    "ase" is the slowest, but it can be used on any system.
                     Defaults to "ase".
-
         Returns:
-            _type_: _description_
+            AtomsGraph: AtomsGraph object.
         """
         device = "cpu" if device is None else device
         elems = torch.tensor(atoms.numbers, dtype=torch.long, device=device)
@@ -164,6 +170,13 @@ class AtomsGraph(Data):
         self_interaction: bool = False,
         backend: Union[str, NeighborListBuilder] = "ase",
     ):
+        """Build neighborlist.
+
+        Args:
+            cutoff (float): Cutoff radius for neighbor list in Angstrom.
+            self_interaction (bool, optional): Whether to add atom as neighbor of itself(=self loop). Defaults to False.
+            backend (Union[str, NeighborListBuilder], optional): The backend for building neighborlist.
+        """
         neighborlist_builder_cls = resolve_neighborlist_builder(backend)
         neighborlist_builder: NeighborListBuilder = neighborlist_builder_cls(cutoff, self_interaction)
         center_idx, neigh_idx, edge_shift = neighborlist_builder.build(self)
@@ -173,7 +186,11 @@ class AtomsGraph(Data):
         self.edge_shift = edge_shift
 
     def to_ase(self) -> Atoms:
-        """Convert to Atoms object."""
+        """Convert to Atoms object.
+
+        Returns:
+            Atoms: ASE Atoms object.
+        """
         if self.cell.norm().abs() < 1e-6:
             pbc = False
         else:
@@ -191,10 +208,21 @@ class AtomsGraph(Data):
         return atoms
 
     def volume(self) -> Tensor:
-        """Return volume of the cell."""
+        """Return volume of the cell.
+
+        Returns:
+            Tensor: Volume of the cell.
+        """
         return self.cell.squeeze().det()
 
     def compute_edge_vecs(self) -> "AtomsGraph":
+        """Compute edge vectors from edge_index and edge_shift.
+
+        Returns:
+            AtomsGraph: self with ``
+            edge_vec``.
+        """
+
         if "edge_index" not in self:
             raise ValueError("Neighbor list is not built.")
         pos = self.pos
@@ -209,7 +237,15 @@ class AtomsGraph(Data):
 
     @staticmethod
     def resolve_cell(atoms: Atoms) -> Tensor:
-        """Resolve cell as tensor from Atoms object."""
+        """Resolve cell as tensor from Atoms object with checking pbc.
+        If pbc is False, return zeros.
+
+        Args:
+            atoms (Atoms): ASE Atoms object.
+
+        Returns:
+            Tensor: 1x3x3 tensor of lattice vectors. (1 is batch dimension)
+        """
         # reject partial pbc
         if atoms.pbc.any() and not atoms.pbc.all():
             raise ValueError("AtomsGraph does not support partial pbc")
