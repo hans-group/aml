@@ -35,7 +35,6 @@ class ASEDataset(InMemoryDataset, BaseDataset):
             "matscipy" is also fast, but it uses minimal image convention,
                 so cannot be used for small cell.
             "ase" is the slowest, but it can be used on any system.
-            ``
         progress_bar (bool, optional): Whether to show progress bar. Defaults to True.
         atomref_energies (dict[str, float], optional): Atomic reference energies. Defaults to None.
             Warning: This argument is deprecated and the values will be ignored.
