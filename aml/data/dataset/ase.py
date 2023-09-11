@@ -1,6 +1,7 @@
 import os
 import warnings
 from pathlib import Path
+from typing import Literal
 
 import torch
 from ase import Atoms
@@ -21,14 +22,32 @@ Images = list[Atoms]
 
 @registry.register_dataset("ase_dataset")
 class ASEDataset(InMemoryDataset, BaseDataset):
+    """In-memory dataset from reading files with ASE.
+    Creates neighbor list for each ``Atoms`` object.
+
+    Args:
+        data_source (str | list[str] | Images | list[Images]): Path to ASE-readable file(s) or (list of) images.
+        index (str | list[str]): Index to read. The length of index must be same as data_source.
+        neighborlist_cutoff (float, optional): Cutoff radius for neighborlist. Defaults to 5.0.
+        neighborlist_backend (str, optional): Backend for neighborlist computation. Defaults to "ase".
+            Options are "ase", "matscipy", and "torch".
+            Usually "torch" is the fastest, but the speed is simliary to "matscipy" when PBC is used.
+            "matscipy" is also fast, but it uses minimal image convention,
+                so cannot be used for small cell.
+            "ase" is the slowest, but it can be used on any system.
+            ``
+        progress_bar (bool, optional): Whether to show progress bar. Defaults to True.
+        atomref_energies (dict[str, float], optional): Atomic reference energies. Defaults to None.
+            Warning: This argument is deprecated and the values will be ignored.
+    """
     def __init__(
         self,
         data_source: str | list[str] | Images | list[Images] = None,
         index: str | list[str] = ":",
         neighborlist_cutoff: float = 5.0,
-        neighborlist_backend: str = "ase",
+        neighborlist_backend: Literal["ase", "matscipy", "torch"] = "ase",
         progress_bar: bool = True,
-        atomref_energies: dict[str, float] | None = None,
+        atomref_energies: dict[str, float] | None = None,  # Deprecated
     ):
         data_source = maybe_list(data_source)
         # Additional listify for raw images input
@@ -68,7 +87,12 @@ class ASEDataset(InMemoryDataset, BaseDataset):
             item.batch = torch.zeros_like(item.elems, dtype=torch.long, device=item.pos.device)
         return item
 
-    def to_ase(self):
+    def to_ase(self) -> list[Atoms]:
+        """Convert to ASE Atoms objects.
+
+        Returns:
+            list[Atoms]: List of ASE Atoms objects.
+        """
         return [atoms.to_ase() for atoms in self]
 
     def get_config(self):
@@ -91,6 +115,9 @@ def read_ase_datapipe(data_source: list[str] | list[Images], index: list[str]) -
     Args:
         data_source (str | list[str]): Path to ASE database.
         index (str | list[str]): Index of ASE database.
+
+    Returns:
+        IterDataPipe: Data pipeline that yields ASE atoms.
     """
     if len(index) == 1:
         index = index * len(data_source)
@@ -121,6 +148,9 @@ def a2g_datapipe(
         atoms_dp (IterDataPipe): Data pipeline that yields ASE atoms.
         neighborlist_cutoff (float): Cutoff radius for neighborlist.
         neighborlist_backend (str): Backend for neighborlist computation.
+
+    Returns:
+        IterDataPipe: Data pipeline that yields AtomsGraph.
     """
     dp = atoms_dp.atoms_to_graph(read_properties=read_properties)
     dp = dp.build_neighbor_list(cutoff=neighborlist_cutoff, backend=neighborlist_backend)
