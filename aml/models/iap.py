@@ -14,6 +14,18 @@ from .base import BaseModel
 
 @registry.register_model("interatomic_potential")
 class InterAtomicPotential(BaseModel):
+    """Interatomic potential model.
+    It wraps an energy model and computes the energy, force, stress and hessian.
+    The energy model should be a subclass of :class:`BaseEnergyModel`.
+
+    Args:
+        energy_model (BaseEnergyModel): The energy model which computes the energy from the data.
+        compute_force (bool, optional): Whether to compute force. Defaults to True.
+        compute_stress (bool, optional): Whether to compute stress. Defaults to False.
+        compute_hessian (bool, optional): Whether to compute hessian. Defaults to False.
+        return_embeddings (bool, optional): Whether to return the embeddings. Defaults to False.
+    """
+
     def __init__(
         self,
         energy_model: BaseEnergyModel,
@@ -42,6 +54,7 @@ class InterAtomicPotential(BaseModel):
 
     @property
     def compute_force(self):
+        """Whether to compute force or not."""
         return self._compute_force
 
     @compute_force.setter
@@ -60,6 +73,7 @@ class InterAtomicPotential(BaseModel):
 
     @property
     def compute_stress(self):
+        """Whether to compute stress or not."""
         return self._compute_stress
 
     @compute_stress.setter
@@ -78,6 +92,7 @@ class InterAtomicPotential(BaseModel):
 
     @property
     def compute_hessian(self):
+        """Whether to compute hessian or not."""
         return self._compute_hessian
 
     @compute_hessian.setter
@@ -101,6 +116,14 @@ class InterAtomicPotential(BaseModel):
         return tuple(keys)
 
     def forward(self, data: DataDict) -> OutputDict:
+        """Forward pass of the model.
+
+        Args:
+            data (DataDict): The input data (or batch). Can be dict or :class:`aml.data.AtomsGraph`.
+
+        Returns:
+            OutputDict: The dict of computed outputs.
+        """
         if K.pos in self.require_grad_keys:
             data[K.pos].requires_grad_(True)
         compute_neighbor_vecs(data)
@@ -121,6 +144,15 @@ class InterAtomicPotential(BaseModel):
         return outputs
 
     def forward_atoms(self, atoms: Atoms, neighborlist_backend="ase") -> OutputDict:
+        """Call the forward method with :class:`ase.Atoms` as input.
+
+        Args:
+            atoms (ase.Atoms): The input atoms.
+            neighborlist_backend (str, optional): The backend for neighbor list. Defaults to "ase".
+
+        Returns:
+            OutputDict: The dict of computed outputs.
+        """
         data = AtomsGraph.from_ase(atoms, self.energy_model.cutoff, neighborlist_backend=neighborlist_backend)
         device = self.parameters().__next__().device
         data = data.to(device)
@@ -129,6 +161,14 @@ class InterAtomicPotential(BaseModel):
 
     @classmethod
     def load(cls, path: str) -> "InterAtomicPotential":
+        """Load the model from checkpoint created by pytorch lightning.
+
+        Args:
+            path (str): Path to the checkpoint file.
+
+        Returns:
+            InterAtomicPotential: The loaded model.
+        """
         map_location = None if torch.cuda.is_available() else "cpu"
         if str(path).endswith(".ckpt"):
             ckpt = torch.load(path, map_location=map_location)
@@ -144,6 +184,15 @@ class InterAtomicPotential(BaseModel):
 
 
 def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_hessian: bool = False):
+    """Compute force and optionally hessian from the input and outputs.
+    Computed properties are stored in the ``outputs`` dict.
+
+    Args:
+        data (DataDict): The input data.
+        outputs (OutputDict): The output dict.
+        grad_vals (DataDict): The values to compute gradient.
+        compute_hessian (bool, optional): Whether to compute hessian. Defaults to False.
+    """
     engrad = grad_vals[K.pos]
     outputs[K.force] = -engrad
     if compute_hessian:
@@ -158,6 +207,15 @@ def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_
 
 
 def get_stress(data: DataDict, outputs: OutputDict, grad_vals: DataDict):
+    """Compute stress from the input and outputs.
+    Computed properties are stored in the ``outputs`` dict.
+
+    Args:
+        data (DataDict): The input data.
+        outputs (OutputDict): The output dict.
+        grad_vals (DataDict): The values to compute gradient.
+    """
+
     engrad_ij = grad_vals[K.edge_vec]
     F_ij = -engrad_ij
     sts = []
