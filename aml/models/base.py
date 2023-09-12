@@ -9,10 +9,13 @@ from aml.common.utils import Configurable
 
 @registry.register_model("base_model")
 class BaseModel(torch.nn.Module, Configurable, ABC):
+    """Base class for models.
+    All models should inherit from this class.
+    """
     @property
     @abstractmethod
     def output_keys(self) -> tuple[str, ...]:
-        """Get the output keys of the model.
+        """Output keys of the model.
         It would vary depending on the state of the model.
         """
 
