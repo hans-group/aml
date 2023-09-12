@@ -167,3 +167,6 @@ processed/
 *.pt
 *.pth
 tensorboard/
+checkpoints/
+*.lmdb
+*.lmdb-lock
