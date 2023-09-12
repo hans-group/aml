@@ -15,6 +15,17 @@ from aml.typing import DataDict, Tensor
 
 @registry.register_energy_model("base")
 class BaseEnergyModel(torch.nn.Module, Configurable, ABC):
+    """Base class for energy models.
+    Takes data or batch and returns energy.
+
+    Args:
+        species (list[str]): List of species.
+        cutoff (float, optional): Cutoff radius. Defaults to 5.0.
+
+    Attributes:
+        embedding_keys (list[str]): List of keys for storing embedding vectors.
+    """
+
     embedding_keys = []
 
     def __init__(self, species: list[str], cutoff: float = 5.0, *args, **kwargs):
@@ -37,12 +48,41 @@ class BaseEnergyModel(torch.nn.Module, Configurable, ABC):
         subset_size: int | float | None = None,
     ):
         """Initialize the model.
-        This typically means setting up the energy scales.
+        This typically means setting up the energy scales and shifts.
         For equivariant models like NequIP and MACE, it would be neccesary to
         compute average number of neighbors.
 
         Args:
-            dataset (_type_): Dataset to initialize the model with.
+            energy_shift_mode (Literal["mean", "atomic_energies"], optional): Mode for energy shift.
+                "mean" means the mean of the dataset will be used.
+                "atomic_energies" means the atomic energies will be used.
+                Defaults to "atomic_energies".
+            energy_scale_mode (Literal["energy_std", "force_rms"], optional): Mode for energy scale.
+                "energy_std" means the standard deviation of the energies will be used.
+                "force_rms" means the root mean square of the forces (per element) will be used.
+                Defaults to "force_rms".
+            energy_mean (Literal["auto"] | float | None, optional): Energy mean to shift.
+                "auto" means the mean of the dataset will be automatically computed. (requires dataset)
+                If float is given, the same value will be used for all species.
+                If None is given, no shift will be applied.
+                Defaults to None.
+            atomic_energies (Literal["auto"] | dict[str, float] | None, optional): Atomic energies to shift.
+                "auto" means the average atomic energies will be automatically computed. (requires dataset)
+                If dict is given, the values will be used for the corresponding species.
+                If None is given, no shift will be applied.
+                Defaults to "auto".
+            energy_scale (Literal["auto"] | float | dict[str, float] | None, optional): Energy scale to multiply.
+                "auto" means the standard deviation of the energies will be automatically computed. (requires dataset)
+                If float is given, the same value will be used for all species.
+                If dict is given, the values will be used for the corresponding species.
+                If None is given, no scale will be applied.
+                Defaults to "auto".
+            trainable_scales (bool, optional): Whether the energy scales are trainable. Defaults to True.
+            dataset (BaseDataset, optional): Dataset to compute statistics. Defaults to None.
+                This is required when "auto" is used for energy_mean, atomic_energies, or energy_scale.
+            subset_size (int | float, optional): Subset size of the dataset to use for computing statistics.
+                This is often neccesary when the number of dataset is larger than 10,000.
+                Defaults to None.
         """
         if dataset is not None and subset_size is not None:
             dataset = dataset.subset(subset_size)
@@ -115,10 +155,24 @@ class BaseEnergyModel(torch.nn.Module, Configurable, ABC):
 
     @abstractmethod
     def forward(self, data: DataDict) -> Tensor:
+        """Compute energy from data.
+
+        Args:
+            data (DataDict): Input data.
+                Required keys are:
+                    - "pos"
+                    - "elems"
+                    - "cell"
+                    - "edge_index"
+                    - "edge_shift"
+        Returns:
+            Tensor: (N,) tensor of energies. (N: number of structures)
+        """
         pass
 
     @torch.jit.ignore
     def get_cutoff(self) -> float:
+        """Get the cutoff radius of the model."""
         return self.cutoff
 
     def get_config(self):
@@ -144,4 +198,9 @@ class BaseEnergyModel(torch.nn.Module, Configurable, ABC):
     @torch.jit.unused
     @property
     def num_params(self):
+        """Count the number of parameters in the model.
+
+        Returns:
+            int: Number of parameters.
+        """
         return sum(p.numel() for p in self.parameters())
