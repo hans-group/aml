@@ -76,6 +76,12 @@ def SimpleIrrepsConfig(config, prefix: str | None = None):
 
 
 class AtomTypeMapping(torch.nn.Module):
+    """Maps atomic numbers to a contiguous range of integers.
+
+    Args:
+        species: List of atomic species to consider.
+    """
+
     def __init__(self, species: list[int]):
         super().__init__()
         sorted_species = sorted(species)
@@ -92,6 +98,32 @@ class AtomTypeMapping(torch.nn.Module):
 
 @registry.register_energy_model("nequip")
 class NequIP(GraphModuleMixin, BaseEnergyModel):
+    """The NequIP model, which applies E(3) equivariant convolution layers using e3nn.
+    Provides "node_features" and "node_vec_features" embeddings.
+
+    Args:
+        species (List[str]): List of atomic species to consider.
+        cutoff (float): Cutoff radius for the ACSF. Default is 5.0.
+        num_layers (int): Number of convolution layers. Default is 4.
+        l_max (int): Maximum spherical harmonic degree. Default is 2.
+        num_features (int): Number of hidden features for atom. Default is 64.
+        parity (bool): Whether to include both even and odd parities in irreps. Default is True.
+        invariant_layers (int): Number of invariant layers. Default is 2.
+        invariant_neurons (int): Number of invariant neurons. Default is 64.
+        use_sc (bool): Whether to use skip connections. Default is True.
+        num_radial_basis (int): Number of radial basis functions. Default is 8.
+        trainable_radial_basis (bool): Whether to train the radial basis functions. Default is True.
+        polynomial_cutoff_p (float): Cutoff exponent for polynomial cutoff. Default is 6.0.
+        resnet (bool): Whether to use ResNet-style skip connections. Default is False.
+        nonlinearity_scalars (dict[str, str]): Nonlinearity to use for scalar features.
+            Different nonlinearities are used for even and odd parities.
+            Default is {"e": "silu", "o": "tanh"}.
+        nonlinearity_gates (dict[str, str]): Nonlinearity to use for gates.
+            Different nonlinearities are used for even and odd parities.
+            Default is {"e": "silu", "o": "tanh"}.
+        avg_num_neighbors (float): Average number of neighbors per atom. Required.
+    """
+
     embedding_keys = [K.node_features, K.node_vec_features]
 
     def __init__(

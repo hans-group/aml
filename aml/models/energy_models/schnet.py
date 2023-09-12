@@ -12,6 +12,21 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("schnet")
 class SchNet(BaseEnergyModel):
+    """SchNet model.
+    This model applies continuous-filter convolutional layers to atomic features.
+    Provides "node_features" embeddings.
+
+    Args:
+        species (list[str]): List of atomic species to consider.
+        cutoff (float): Cutoff radius for interactions. Defaults to 5.0.
+        hidden_channels (int): Number of hidden channels in the convolutional layers. Defaults to 128.
+        n_filters (int): Number of convolutional filters. Defaults to 128.
+        n_interactions (int): Number of convolutional layers. Defaults to 6.
+        rbf_type (str): Type of radial basis functions. One of "gaussian" or "bessel".
+            Defaults to "gaussian".
+        n_rbf (int): Number of radial basis functions. Defaults to 50.
+        trainable_rbf (bool): Whether to train the radial basis functions. Defaults to False.
+    """
     embedding_keys = [K.node_features]
 
     def __init__(

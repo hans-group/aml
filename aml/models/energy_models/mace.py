@@ -54,6 +54,31 @@ def to_one_hot(indices: torch.Tensor, num_classes: int) -> torch.Tensor:
 
 @registry.register_energy_model("mace")
 class MACE(BaseEnergyModel):
+    """A MACE (Multi-ACE) model.
+    Uses equivariant message passing to predict the body-ordered energy of the system.
+    Provides "node_features" embeddings.
+
+    Args:
+        species (List[str]): List of atomic species to consider.
+        cutoff (float): Cutoff radius for the ACSF. Default is 5.0.
+        num_bessel (int): Number of Bessel RBF functions to use. Default is 8.
+        num_polynomial_cutoff (int): Number of polynomial cutoff functions to use. Default is 5.
+        num_interactions (int): Number of interaction layers. Default is 2.
+        residual_first_interaction (bool): Whether to use residual connections in the first interaction layer.
+            Default is False.
+        l_max (int): Maximum spherical harmonic degree. Default is 3.
+        hidden_irreps (str): Hidden irreps for the interactions. Default is "128x0e + 128x1o".
+            See https://e3nn.org/ for more information.
+        correlation (int): Maximum body-order to consider. Default is 3.
+        MLP_irreps (str): Irreps for the MLP readout. Default is "16x0e".
+            See https://e3nn.org/ for more information.
+        gate (str): Activation function to use in the MLP readout. Default is "silu".
+        atomic_energies (dict[str, float]): Atomic energies to shift. Default is None.
+            This is required parameter.
+        avg_num_neighbors (float): Average number of neighbors per atom. Default is None.
+            This is required parameter.
+    """
+
     embedding_keys = [K.node_features]
 
     def __init__(

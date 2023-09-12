@@ -14,12 +14,33 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("painn")
 class PaiNN(BaseEnergyModel):
+    """PaiNN model, as described in https://arxiv.org/abs/2102.03150.
+    This model applies equivariant message passing layers within cartesian coordinates.
+    Provides "node_features" and "node_vec_features" embeddings.
+
+    Args:
+        species (list[str]): List of atomic species to consider.
+        cutoff (float): Cutoff radius for interactions. Defaults to 5.0.
+        hidden_channels (int): Number of hidden channels in the convolutional layers. Defaults to 128.
+        n_interactions (int): Number of message passing layers. Defaults to 3.
+        rbf_type (str): Type of radial basis functions. One of "gaussian" or "bessel".
+            Defaults to "bessel".
+        n_rbf (int): Number of radial basis functions. Defaults to 20.
+        trainable_rbf (bool): Whether to train the radial basis functions. Defaults to False.
+        activation (str): Activation function to use in the convolutional layers. Defaults to "silu".
+        shared_interactions (bool): Whether to share the convolutional layers across interactions.
+            Defaults to False.
+        shared_filters (bool): Whether to share the convolutional filters across interactions.
+            Defaults to False.
+        epsilon (float): Small value to add to the denominator for numerical stability. Defaults to 1e-8.
+    """
+
     embedding_keys = [K.node_features, K.node_vec_features]
 
     def __init__(
         self,
         species,
-        cutoff=5.0,
+        cutoff: float = 5.0,
         hidden_channels: int = 128,
         n_interactions: int = 3,
         rbf_type: Literal["gaussian", "bessel"] = "bessel",

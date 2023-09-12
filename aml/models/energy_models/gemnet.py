@@ -43,54 +43,31 @@ def compute_neighbors(data, edge_index):
 class GemNetT(BaseEnergyModel):
     """
     GemNet-T, triplets-only variant of GemNet
+    Code taken and modified from https://github.com/ocp/ocpmodels
+    Provides "node_features" and "edge_features" embeddings.
 
-    Parameters
-    ----------
-        num_spherical: int
-            Controls maximum frequency.
-        num_radial: int
-            Controls maximum frequency.
-        num_blocks: int
-            Number of building blocks to be stacked.
-
-        emb_size_atom: int
-            Embedding size of the atoms.
-        emb_size_edge: int
-            Embedding size of the edges.
-        emb_size_trip: int
-            (Down-projected) Embedding size in the triplet message passing block.
-        emb_size_rbf: int
-            Embedding size of the radial basis transformation.
-        emb_size_cbf: int
-            Embedding size of the circular basis transformation (one angle).
-        emb_size_bil_trip: int
-            Embedding size of the edge embeddings in the triplet-based message passing block after the bilinear layer.
-
-        num_before_skip: int
-            Number of residual blocks before the first skip connection.
-        num_after_skip: int
-            Number of residual blocks after the first skip connection.
-        num_concat: int
-            Number of residual blocks after the concatenation.
-        num_atom: int
-            Number of residual blocks in the atom embedding blocks.
-
-
-        cutoff: float
-            Embedding cutoff for interactomic directions in Angstrom.
-        rbf: dict
-            Name and hyperparameters of the radial basis function.
-        envelope: dict
-            Name and hyperparameters of the envelope function.
-        cbf: dict
-            Name and hyperparameters of the cosine basis function.
-        extensive: bool
-            Whether the output should be extensive (proportional to the number of atoms)
-        output_init: str
-            Initialization method for the final dense layer.
-        activation: str
-            Name of the activation function.
-
+    Args:
+        num_spherical (int): Controls maximum frequency.
+        num_radial (int): Controls maximum frequency.
+        num_blocks (int): Number of building blocks to be stacked.
+        emb_size_atom (int): Embedding size of the atoms.
+        emb_size_edge (int): Embedding size of the edges.
+        emb_size_trip (int): (Down-projected) Embedding size in the triplet message passing block.
+        emb_size_rbf (int): Embedding size of the radial basis transformation.
+        emb_size_cbf (int): Embedding size of the circular basis transformation (one angle).
+        emb_size_bil_trip (int): Embedding size of the edge embeddings in the triplet-based message passing block after 
+            the bilinear layer.
+        num_before_skip (int): Number of residual blocks before the first skip connection.
+        num_after_skip (int): Number of residual blocks after the first skip connection.
+        num_concat (int): Number of residual blocks after the concatenation.
+        num_atom (int): Number of residual blocks in the atom embedding blocks.
+        cutoff (float): Embedding cutoff for interactomic directions in Angstrom.
+        rbf (dict): Name and hyperparameters of the radial basis function.
+        envelope (dict): Name and hyperparameters of the envelope function.
+        cbf (dict): Name and hyperparameters of the cosine basis function.
+        extensive (bool): Whether the output should be extensive (proportional to the number of atoms)
+        output_init (str): Initialization method for the final dense layer.
+        activation (str): Name of the activation function.
     """
 
     embedding_keys = [K.node_features, K.edge_features]

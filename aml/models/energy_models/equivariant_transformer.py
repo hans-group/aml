@@ -11,7 +11,26 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("equivariant_transformer")
 class EquivariantTransformer(BaseEnergyModel):
-    """The TorchMD-net equivariant Transformer model."""
+    """The TorchMD-net equivariant Transformer model.
+    This model applies graph attention layers with PaiNN-style equivariant convolutions.
+    Provides "node_features" and "node_vec_features" embeddings.
+    Code taken and modified from https://github.com/torchmd/torchmd-net.
+
+    Args:
+        species: List of atomic species to consider.
+        cutoff: Cutoff radius for the ACSF.
+        hidden_channels: Number of hidden channels in the Transformer.
+        num_layers: Number of Transformer layers.
+        num_rbf: Number of radial basis functions.
+        rbf_type: Type of radial basis functions.
+        trainable_rbf: Whether to train the radial basis functions.
+        activation: Activation function to use in the Transformer.
+        attn_activation: Activation function to use in the attention layers.
+        neighbor_embedding: Whether to use neighbor embedding.
+        num_heads: Number of attention heads.
+        distance_influence: Whether to use distance influence.
+        cutoff_lower: Lower cutoff radius for the Transformer.
+    """
 
     embedding_keys = [K.node_features, K.node_vec_features]
 
