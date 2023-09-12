@@ -18,17 +18,28 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("bpnn")
 class BPNN(BaseEnergyModel):
-    """Behler-Parrinello Neural Network (BPNN) force field model."""
+    """Behler-Parrinello Neural Network (BPNN) potential model.
+    Uses simple atom-centered symmetry functions (ACSF) to encode the
+    local environment of each atom. The ACSF are then fed into a
+    fully-connected neural network to predict the energy of the system.
+
+    Args:
+        species: List of atomic species to consider.
+        acsf_params: ACSF parameters. If None, default parameters are used.
+        hidden_layers: Number of hidden layers in the neural network.
+        activation: Activation function to use in the neural network.
+        cutoff: Cutoff radius for the ACSF.
+    """
 
     embedding_keys = [K.node_features]
 
     def __init__(
         self,
         species: list[str],
+        cutoff: float = 5.0,
         acsf_params: Dict[str, Any] = None,
         hidden_layers=(64, 64),
         activation="silu",
-        cutoff: float = 5.0,
     ):
         super().__init__(species, cutoff)
         self.register_buffer("atomic_numbers", canocialize_species(species))
@@ -59,7 +70,6 @@ class BPNN(BaseEnergyModel):
                         torch.nn.init.zeros_(layer.bias)
 
     def forward(self, data: DataDict) -> Tensor:
-        """Compute ACSF and update the data dictionary."""
         compute_neighbor_vecs(data)
         # Compute ACSF
         G = self.acsf(data)
