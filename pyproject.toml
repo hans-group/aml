@@ -34,6 +34,18 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 dev = ["flake8", "black", "isort", "jupyter", "pytest", "ruff"]
+build_doc = [
+  "sphinx",
+  "sphinx-autodoc-typehints~=1.18.0",
+  "sphinxcontrib-napoleon",
+  "myst-parser",
+  "myst-nb",
+  "sphinx-copybutton",
+  "sphinx_design",
+  "sphinx_book_theme",
+  "sphinx-remove-toctrees",
+  "jupyter-sphinx",
+]
 
 # [project.scripts]
 # neural_iap = "neural_iap.cli.app:app"
