@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Literal
 
+import numpy as np
 from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
@@ -112,13 +113,13 @@ class AMLCalculator(Calculator):  # noqa: F821
         if "forces" in properties:
             if not self.compute_force:
                 raise RuntimeError("Force calculation is not enabled.")
-            self.results.update(forces=output[K.force].detach().cpu().numpy())
+            self.results.update(forces=output[K.force].detach().cpu().numpy().astype(np.float64))
         if "stress" in properties:
             if not self.compute_stress:
                 raise RuntimeError("Stress calculation is not enabled.")
-            s = output[K.stress].detach().cpu().numpy().squeeze()
+            s = output[K.stress].detach().cpu().numpy().squeeze().astype(np.float64)
             self.results.update(stress=full_3x3_to_voigt_6_stress(s))
         if "hessian" in properties:
             if not self.compute_hessian:
                 raise RuntimeError("Hessian calculation is not enabled.")
-            self.results.update(hessian=output[K.hessian].detach().cpu().numpy())
+            self.results.update(hessian=output[K.hessian].detach().cpu().numpy().astype(np.float64))
