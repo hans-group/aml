@@ -12,54 +12,6 @@ from aml.typing import DataDict, OutputDict
 from .base import BaseModel
 
 
-def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_hessian: bool = False):
-    engrad = grad_vals[K.pos]
-    outputs[K.force] = -engrad
-    if compute_hessian:
-        r = -outputs[K.force].view(-1)
-        s = r.size(0)
-        hessian = outputs[K.energy].new_zeros((s, s))
-        for iatom in range(s):
-            tmp = torch.autograd.grad([r[iatom]], [data[K.pos]], retain_graph=iatom < s)[0]
-            if tmp is not None:
-                hessian[iatom] = tmp.view(-1)
-        outputs[K.hessian] = hessian
-
-
-def get_stress(data: DataDict, outputs: OutputDict, grad_vals: DataDict):
-    engrad_ij = grad_vals[K.edge_vec]
-    F_ij = -engrad_ij
-    sts = []
-    count_edge = 0
-    count_node = 0
-    batch_size = int(data[K.batch].max() + 1)
-    for i in range(batch_size):
-        batch = data[K.batch]
-        num_nodes = 0
-        edge_batch = batch[data[K.edge_index][1, :]]
-        num_edges = (edge_batch == i).sum()
-        cell = data[K.cell][i]
-        volume = torch.det(cell)
-        if volume < 1e-6:
-            raise RuntimeError("Volume of cell is too small or zero. Make sure that the system is periodic.")
-        sts.append(
-            -1
-            * (
-                torch.matmul(
-                    data[K.edge_vec][count_edge : count_edge + num_edges].T,  # noqa
-                    F_ij[count_edge : count_edge + num_edges],  # noqa
-                )
-                / volume
-            )
-        )
-        count_edge = count_edge + num_edges
-        num_nodes = (batch == i).sum()
-        count_node = count_node + num_nodes
-
-    outputs[K.stress] = torch.stack(sts)
-    return outputs
-
-
 @registry.register_model("interatomic_potential")
 class InterAtomicPotential(BaseModel):
     def __init__(
@@ -189,3 +141,51 @@ class InterAtomicPotential(BaseModel):
             return model
         else:
             raise NotImplementedError("Currently only support .ckpt file")
+
+
+def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_hessian: bool = False):
+    engrad = grad_vals[K.pos]
+    outputs[K.force] = -engrad
+    if compute_hessian:
+        r = -outputs[K.force].view(-1)
+        s = r.size(0)
+        hessian = outputs[K.energy].new_zeros((s, s))
+        for iatom in range(s):
+            tmp = torch.autograd.grad([r[iatom]], [data[K.pos]], retain_graph=iatom < s)[0]
+            if tmp is not None:
+                hessian[iatom] = tmp.view(-1)
+        outputs[K.hessian] = hessian
+
+
+def get_stress(data: DataDict, outputs: OutputDict, grad_vals: DataDict):
+    engrad_ij = grad_vals[K.edge_vec]
+    F_ij = -engrad_ij
+    sts = []
+    count_edge = 0
+    count_node = 0
+    batch_size = int(data[K.batch].max() + 1)
+    for i in range(batch_size):
+        batch = data[K.batch]
+        num_nodes = 0
+        edge_batch = batch[data[K.edge_index][1, :]]
+        num_edges = (edge_batch == i).sum()
+        cell = data[K.cell][i]
+        volume = torch.det(cell)
+        if volume < 1e-6:
+            raise RuntimeError("Volume of cell is too small or zero. Make sure that the system is periodic.")
+        sts.append(
+            -1
+            * (
+                torch.matmul(
+                    data[K.edge_vec][count_edge : count_edge + num_edges].T,  # noqa
+                    F_ij[count_edge : count_edge + num_edges],  # noqa
+                )
+                / volume
+            )
+        )
+        count_edge = count_edge + num_edges
+        num_nodes = (batch == i).sum()
+        count_node = count_node + num_nodes
+
+    outputs[K.stress] = torch.stack(sts)
+    return outputs
