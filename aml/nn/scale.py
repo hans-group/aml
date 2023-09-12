@@ -11,7 +11,9 @@ class GlobalScaleShift(torch.nn.Module):
     Caution: mean value is for per atom energy, not per molecule energy.
 
     Args:
-        torch (_type_): _description_
+        mean: mean value of energy.
+        std: standard deviation of energy.
+        key: key of energy in data dictionary.
     """
 
     def __init__(self, mean=0.0, std=1.0, key=K.energy):

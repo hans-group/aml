@@ -13,17 +13,20 @@ def gaussian_rbf(inputs: Tensor, offsets: Tensor, widths: Tensor) -> Tensor:
 
 
 class GaussianRBF(torch.nn.Module):
-    r"""Gaussian radial basis functions."""
+    r"""Gaussian radial basis functions.
+    .. math::
+        \phi_{\mu, \sigma}(x) = \exp\left(-\frac{1}{2\sigma^2}(x-\mu)^2\right)
+
+    Args:
+        n_rbf: total number of Gaussian functions, :math:`N_g`.
+        cutoff: center of last Gaussian function, :math:`\mu_{N_g}`
+        start: center of first Gaussian function, :math:`\mu_0`.
+        trainable: If True, widths and offset of Gaussian functions
+            are adjusted during training process.
+    """
 
     def __init__(self, n_rbf: int, cutoff: float, start: float = 0.0, trainable: bool = False):
-        r"""
-        Args:
-            n_rbf: total number of Gaussian functions, :math:`N_g`.
-            cutoff: center of last Gaussian function, :math:`\mu_{N_g}`
-            start: center of first Gaussian function, :math:`\mu_0`.
-            trainable: If True, widths and offset of Gaussian functions
-                are adjusted during training process.
-        """
+        r""" """
         super(GaussianRBF, self).__init__()
         self.n_rbf = n_rbf
 
@@ -44,6 +47,10 @@ class GaussianRBF(torch.nn.Module):
 class BesselRBF(torch.nn.Module):
     """
     Sine for radial basis functions with coulomb decay (0th order bessel).
+    Args:
+        cutoff: radial cutoff
+        n_rbf: number of basis functions.
+
     References:
     .. [#dimenet] Klicpera, Groß, Günnemann:
        Directional message passing for molecular graphs.
@@ -51,11 +58,7 @@ class BesselRBF(torch.nn.Module):
     """
 
     def __init__(self, n_rbf: int, cutoff: float, trainable: bool = False):
-        """
-        Args:
-            cutoff: radial cutoff
-            n_rbf: number of basis functions.
-        """
+        """ """
         super(BesselRBF, self).__init__()
         self.n_rbf = n_rbf
         if n_rbf > 20:

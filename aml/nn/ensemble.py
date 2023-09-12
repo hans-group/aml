@@ -5,6 +5,14 @@ from aml.typing import DataDict, OutputDict
 
 
 class EnsembleModel(BaseModel):
+    """Ensemble of models.
+    Can be used for uncertainty estimation.
+
+    Args:
+        models (list[BaseModel]): List of models to ensemble.
+        return_only_mean (bool): Whether to return only the mean of the outputs.
+    """
+
     def __init__(
         self,
         models: list[BaseModel],
@@ -21,6 +29,14 @@ class EnsembleModel(BaseModel):
         return self.models[0].output_keys
 
     def forward(self, data: DataDict) -> OutputDict:
+        """Compute outputs.
+
+        Args:
+            data (DataDict): Input data.
+
+        Returns:
+            OutputDict: Model outputs with mean and stddev.
+        """
         # Initialize output dict
         outputs = {key: [] for key in self.output_keys}
         output_mean, output_std = {}, {}

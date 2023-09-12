@@ -7,6 +7,19 @@ from aml.typing import Tensor
 
 
 class MLP(torch.nn.Module):
+    """Multi-layer perceptron.
+
+    Args:
+        n_input (int): Number of input features.
+        n_output (int): Number of output features.
+        hidden_layers (Sequence[int]): Number of hidden units in each layer. Defaults to (64, 64).
+        activation (str): Activation function to use. Defaults to "silu".
+        activation_kwargs (Optional[Dict[str, Any]]): Keyword arguments for the activation function.
+            Defaults to None.
+        activate_final (bool): Whether to apply the activation function to the final layer. Defaults to False.
+        w_init (str): Weight initializer. Defaults to "xavier_uniform".
+        b_init (str): Bias initializer. Defaults to "zeros".
+    """
     def __init__(
         self,
         n_input: int,
@@ -57,6 +70,18 @@ class GatedEquivariantMLP(torch.nn.Module):
 
     Gated equivariant block as used for the prediction of tensorial properties by PaiNN.
     Transforms scalar and vector representation using gated nonlinearities.
+
+    Args:
+        n_scalar_input (int): Number of input scalar features.
+        n_vector_input (int): Number of input vector features.
+        n_scalar_output (int): Number of output scalar features.
+        n_vector_output (int): Number of output vector features.
+        hidden_layers (Sequence[int]): Number of hidden units in each layer. Defaults to (64, 64).
+        activation (str): Activation function to use. Defaults to "silu".
+        scalar_activation (Optional[str]): Activation function to use for scalar outputs. Defaults to None.
+        w_init (str): Weight initializer. Defaults to "xavier_uniform".
+        b_init (str): Bias initializer. Defaults to "zeros".
+
     References:
     .. [#painn1] Schütt, Unke, Gastegger:
        Equivariant message passing for the prediction of tensorial properties and molecular spectra.
