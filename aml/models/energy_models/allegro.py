@@ -20,6 +20,59 @@ from .base import BaseEnergyModel
 
 @registry.register_energy_model("allegro")
 class Allegro(BaseEnergyModel):
+
+    """This class implements E(3)-equivariant ``Allegro`` model
+        (original paper: A.Musaelian et al.https://doi.org/10.1038/s41467-023-36329-y)
+    This model computes per-edge energy using MLP and then sums them up to get total energy.
+    Source code is taken from https://github.com/mir-group/allegro
+    This model provides "node_features" as embedding vectors.
+
+    Args:
+        species (list[str]): List of species.
+        cutoff (float, optional): Cutoff radius. Defaults to 5.0.
+        cutoff_p (float, optional): Exponent of cutoff function. Defaults to 6.
+        num_layers (int, optional): Number of layers. Defaults to 2.
+        l_max (int, optional): Maximum angular momentum of spherical harmonics.
+            Increase this to apply higher-order equivariance. Defaults to 1.
+        parity (str, optional): Parity of spherical harmonics.
+            One of "o3_full", "o3_restricted", "so3". Defaults to "o3_full".
+        num_basis (int, optional): Number of radial basis functions. Defaults to 8.
+        trainable_basis (bool, optional): Whether to train radial basis functions. Defaults to True.
+        normalize_basis (bool, optional): Whether to normalize radial basis functions. Defaults to True.
+        two_body_latent_mlp_latent_dimensions (list[int], optional): Latent dimensions of two-body MLP.
+            Defaults to [32, 64, 128, 256].
+        latent_mlp_latent_dimensions (list[int], optional): Latent dimensions of latent (hidden) MLP.
+            Defaults to [256, 256].
+        env_embed_multiplicity (int, optional): Multiplicity of local geometry embedding.
+            Defaults to 32.
+        edge_eng_mlp_latent_dimensions (list[int], optional): Latent dimensions of edge energy MLP.
+            Defaults to [128].
+        avg_num_neighbors (Optional[float], optional): Average number of neighbors. This is required
+            although marked as optional. Defaults to None.
+        r_start_cos_ratio (float, optional): Ratio of cutoff radius to start radius of cutoff function.
+            Defaults to 0.8.
+        per_layer_cutoffs (Optional[List[float]], optional): Cutoff radii for each layer.
+            Defaults to None.
+        edge_sh_normalize (bool, optional): Whether to normalize spherical harmonics.
+            Defaults to True.
+        edge_sh_normalization (str, optional): Normalization mode for spherical harmonics.
+            One of "integral", "component", "norm". Defaults to "component".
+        embed_initial_edge (bool, optional): Whether to embed initial edge. Defaults to True.
+        linear_after_env_embed (bool, optional): Whether to use linear layer after local geometry embedding.
+            Defaults to False.
+        nonscalars_include_parity (bool, optional): Whether to include parity in non-scalar features.
+            Defaults to True.
+        latent_resnet (bool, optional): Whether to use residual connections in latent MLP.
+            Defaults to True.
+        latent_resnet_update_ratios (Optional[List[float]], optional): Update ratios for residual connections
+            in latent MLP. Defaults to None.
+        latent_resnet_update_ratios_learnable (bool, optional): Whether to learn update ratios for residual
+            connections in latent MLP. Defaults to False.
+        pad_to_alignment (int, optional): Padding to alignment. Defaults to 1.
+        sparse_mode (Optional[str], optional): Sparse mode. "coo" or "csr". Defaults to None.
+
+    """
+
     embedding_keys = [K.node_features]
 
     def __init__(
