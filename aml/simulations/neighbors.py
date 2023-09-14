@@ -64,7 +64,7 @@ class NeighborlistUpdater:
             new (DataDict): New atoms to apply neighborlist.
         """
         device = new.pos.device
-        center_idx, neigh_idx, edge_shift = self.neighborlist_builder.build(new.cpu())
+        center_idx, neigh_idx, edge_shift = self.neighborlist_builder.build(new)
         edge_index = torch.stack([neigh_idx, center_idx], dim=0)
         new.edge_index = edge_index
         new.edge_shift = edge_shift
