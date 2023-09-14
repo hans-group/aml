@@ -1,8 +1,13 @@
+from typing import Any, Dict
+
 import lightning as L
 from lightning.pytorch import callbacks
+from lightning.pytorch.callbacks.progress.rich_progress import CustomProgress, RichProgressBarTheme
+from rich import get_console, reconfigure
 from torch_ema import ExponentialMovingAverage as EMA
 
 from aml.common.registry import registry
+from aml.train.rich_utils import MetricsTextColumn
 
 
 @registry.register_callback("exponential_moving_average")
@@ -42,3 +47,38 @@ class ExponentialMovingAverage(callbacks.Callback):
 
     def state_dict(self):
         return {"ema": self.ema.state_dict()}
+
+
+default_theme = RichProgressBarTheme()
+
+
+@registry.register_callback("rich_progress_bar")
+class RichProgressBar(callbacks.RichProgressBar):
+    def __init__(
+        self,
+        refresh_rate: int = 1,
+        leave: bool = False,
+        precision: int = 6,
+        theme: RichProgressBarTheme = default_theme,
+        console_kwargs: Dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(refresh_rate, leave, theme, console_kwargs)
+        self._precision = precision
+
+    def _init_progress(self, trainer: "L.Trainer") -> None:
+        if self.is_enabled and (self.progress is None or self._progress_stopped):
+            self._reset_progress_bar_ids()
+            reconfigure(**self._console_kwargs)
+            self._console = get_console()
+            self._console.clear_live()
+            self._metric_component = MetricsTextColumn(trainer, self.theme.metrics, precision=self._precision)
+            self.progress = CustomProgress(
+                *self.configure_columns(trainer),
+                self._metric_component,
+                auto_refresh=False,
+                disable=self.is_disabled,
+                console=self._console,
+            )
+            self.progress.start()
+            # progress has started
+            self._progress_stopped = False
