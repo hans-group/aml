@@ -39,6 +39,7 @@ class PotentialTrainingModule(L.LightningModule):
         per_atom_loss_keys: tuple[str, ...] = ("energy",),
         loss_type: str = "mse_loss",
         metrics: tuple[str, ...] = ("energy_mae", "force_mae"),
+        train_metric_log_freqeuency: int = 50,
         optimizer: str = "adam",
         optimizer_config: Config | None = None,
         lr_scheduler: str | None = None,
@@ -58,6 +59,7 @@ class PotentialTrainingModule(L.LightningModule):
         self.per_atom_loss_keys = per_atom_loss_keys
         self.loss_type = loss_type
         self.metrics = metrics
+        self.train_metric_log_freqeuency = train_metric_log_freqeuency
         self.optimizer = optimizer
         self.optimizer_config = optimizer_config or {}
         self.lr_scheduler = lr_scheduler
@@ -136,6 +138,12 @@ class PotentialTrainingModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         output = self._compute_output_and_loss(batch)
         self.log("train_loss", output["loss"].item(), prog_bar=True, batch_size=get_batch_size(batch))
+        if self.train_metric_log_freqeuency > 0 and batch_idx % self.train_metric_log_freqeuency == 0:
+            self.eval()
+            for metric, metric_fn in self.metric_fns.items():
+                name = f"train_{metric}"
+                self.log(name, metric_fn(batch, output).item(), prog_bar=True, batch_size=get_batch_size(batch))
+            self.train()
         return output
 
     def _common_inference_step(self, batch, batch_idx, mode="val"):
