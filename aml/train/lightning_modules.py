@@ -153,7 +153,14 @@ class PotentialTrainingModule(L.LightningModule):
 
         for metric, metric_fn in self.metric_fns.items():
             name = f"{mode}_{metric}"
-            self.log(name, metric_fn(batch, output).item(), prog_bar=True, batch_size=get_batch_size(batch))
+            self.log(
+                name,
+                metric_fn(batch, output).item(),
+                prog_bar=True,
+                batch_size=get_batch_size(batch),
+                on_step=True,
+                on_epoch=False,
+            )
 
         return output
 
