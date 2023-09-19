@@ -9,11 +9,14 @@ from ase.md.nptberendsen import NPTBerendsen
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
+from aml.common.utils import log_and_print
+from aml.simulations.md.ensembles.nosehoover import NoseHooverChain
 from aml.simulations.simulation import Simulation
 from aml.simulations.temperature_strategy import ConstantTemperature, TemperatureStrategy
 
 _ensemble_maps = {
     "nve": VelocityVerlet,
+    "nvt_nosehoover": NoseHooverChain,
     "nvt_langevin": Langevin,
     "nvt_andersen": Andersen,
     "nvt_berendsen": NVTBerendsen,
@@ -23,6 +26,7 @@ _ensemble_maps = {
 
 _ensemble_default_params = {
     "nvt_langevin": {"friction": 0.02},
+    "nvt_nosehoover": {"tau": 10 * units.fs, "num_chains": 5},
 }
 
 
@@ -33,7 +37,7 @@ class MolecularDynamics(Simulation):
         timestep: float,  # fs
         temperature: TemperatureStrategy | float = 300.0,  # K
         external_pressure: float = None,  # bar
-        ensemble: str = "nvt_langevin",
+        ensemble: str = "nvt_nosehoover",
         ensemble_params: dict = None,  # {"name": "...", ...},
         log_file: Optional[PathLike] = None,
         log_interval: int = 1,
@@ -69,6 +73,9 @@ class MolecularDynamics(Simulation):
         if any(val in self.ensemble_params for val in forbidden_keys):
             raise ValueError(f"Keys {forbidden_keys} are forbidden in ensemble_params.")
 
+        default_kwargs = _ensemble_default_params.get(self.ensemble, {})
+        self.ensemble_params.update(default_kwargs)
+
         kwargs = deepcopy(self.ensemble_params)
         if self.ensemble != "nve":
             kwargs["temperature_K"] = self.initial_temperature
@@ -81,7 +88,6 @@ class MolecularDynamics(Simulation):
             if kwargs["externalstress"] is not None:
                 kwargs["externalstress"] *= units.bar
         dyn_class = _ensemble_maps[self.ensemble]
-        default_kwargs = _ensemble_default_params.get(self.ensemble, {})
         for key, val in default_kwargs.items():
             if key not in kwargs:
                 kwargs[key] = val
@@ -108,7 +114,35 @@ class MolecularDynamics(Simulation):
             self.dyn.set_temperature(temperature_K=self.temperature())
         return False
 
+    def print_info(self):
+        header = (
+            "========================================\n"
+            "=======  Molecular Dynamics Run  =======\n"
+            "========================================"
+        )
+        log_and_print(header, self.log_file)
+        log_and_print(f"Ensemble type: {self.ensemble}", self.log_file)
+        log_and_print("Parameters:", self.log_file)
+        log_and_print(f"  Time step: {self.timestep:.2f} fs", self.log_file)
+        log_and_print(f"  Initial temperature: {self.initial_temperature:.2f} K", self.log_file)
+        temp_schedule = self.temperature.get_schedule(self.timestep)
+        log_and_print(f"  Temperature schedule:\n{indent(temp_schedule, 4)}", self.log_file)
+        if "npt" in self.ensemble:
+            log_and_print(f"  External pressure: {self.external_pressure} eV/A^2", self.log_file)
+        for name in self.ensemble_params:
+            value = self.ensemble_params[name]
+            if isinstance(value, float):
+                value = round(value, 6)
+            log_and_print(f"  {name}: {value}", self.log_file)
+
     def run(self, n_steps: int) -> None:
+        self.print_info()
+        log_and_print(f"Total simulation time: {(self.timestep * n_steps * 1e-3):.2f} ps", self.log_file)
+        log_and_print("Starting simulation", self.log_file)
         if self.temperature.n_steps is not None and self.temperature.n_steps != n_steps:
             raise ValueError(f"n_steps={n_steps} does not match temperature.n_steps={self.temperature.n_steps}")
         return super().run(n_steps)
+
+
+def indent(s, n=4):
+    return "\n".join(" " * n + line for line in s.splitlines())

@@ -40,6 +40,10 @@ class TemperatureStrategy(ABC):
             step (int): Current step.
         """
 
+    @abstractmethod
+    def get_schedule(self, dt: float, start_time: float = 0.0) -> str:
+        pass
+
     def __repr__(self):
         return f"{self.__class__.__name__}(n_steps={self.n_steps})"
 
@@ -69,6 +73,18 @@ class ConstantTemperature(TemperatureStrategy):
     def __str__(self):
         return self.__repr__()
 
+    def get_schedule(self, dt, start_time=0) -> str:
+        start_time *= 1e-3
+        dt *= 1e-3
+        if self.n_steps is None:
+            s = f"t = {start_time:.4f} ps ~ : {self.temperature:.4f} K\n"
+        else:
+            end_time = start_time + dt * self.n_steps
+            start = f"{round(start_time, 4)}"
+            end = f"{round(end_time, 4)}"
+            s = f"t = {start} ps-> {end} ps: T = {self.temperature:.2f} K"
+        return s
+
 
 class LinearTemperature(TemperatureStrategy):
     """Linearly modify temperature from initial_temperature to final_temperature.
@@ -95,6 +111,15 @@ class LinearTemperature(TemperatureStrategy):
             f"{self.__class__.__name__}(initial_temperature={self.initial_temperature:.2f}, "
             f"final_temperature={self.final_temperature:.2f}, n_steps={self.n_steps})"
         )
+
+    def get_schedule(self, dt, start_time=0) -> str:
+        start_time *= 1e-3
+        dt *= 1e-3
+        end_time = start_time + dt * self.n_steps
+        start = f"{round(start_time, 4)}"
+        end = f"{round(end_time, 4)}"
+        s = f"t = {start} ps-> {end} ps: {self.initial_temperature:.2f} K -> T = {self.final_temperature:.2f} K"
+        return s
 
 
 def combine_strategies(*strategies: List[TemperatureStrategy]):
@@ -134,6 +159,14 @@ def combine_strategies(*strategies: List[TemperatureStrategy]):
                 s += f"    {strategy}\n"
             s += f"    total_steps={self.n_steps}\n"
             s += ")"
+            return s
+
+        def get_schedule(self, dt, start_time=0):
+            s = ""
+            start_time = start_time
+            for strategy in self.strategies:
+                s += strategy.get_schedule(dt, start_time) + "\n"
+                start_time += dt * strategy.n_steps
             return s
 
     return CombinedTemperature()
