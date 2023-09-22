@@ -33,6 +33,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+extra_thermostats = ["jax[cpu]", "jax-md"]
 dev = ["flake8", "black", "isort", "jupyter", "pytest", "ruff"]
 build_doc = [
   "sphinx",

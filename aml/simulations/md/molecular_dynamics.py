@@ -10,23 +10,23 @@ from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
 from aml.common.utils import log_and_print
-from aml.simulations.md.ensembles.nosehoover import NoseHooverChain
+from aml.simulations.md.ensembles.nosehoover import NVTNoseHoover
 from aml.simulations.simulation import Simulation
 from aml.simulations.temperature_strategy import ConstantTemperature, TemperatureStrategy
 
 _ensemble_maps = {
     "nve": VelocityVerlet,
-    "nvt_nosehoover": NoseHooverChain,
     "nvt_langevin": Langevin,
     "nvt_andersen": Andersen,
     "nvt_berendsen": NVTBerendsen,
+    "nvt_nosehoover": NVTNoseHoover,
     "npt_berendsen": NPTBerendsen,
     "npt_nosehoover": NPT,
 }
 
 _ensemble_default_params = {
     "nvt_langevin": {"friction": 0.02},
-    "nvt_nosehoover": {"tau": 10 * units.fs, "num_chains": 5},
+    "nvt_nosehoover": {"chain_length": 5, "chain_steps": 2, "sy_steps": 3, "tau": None},
 }
 
 
@@ -37,7 +37,7 @@ class MolecularDynamics(Simulation):
         timestep: float,  # fs
         temperature: TemperatureStrategy | float = 300.0,  # K
         external_pressure: float = None,  # bar
-        ensemble: str = "nvt_nosehoover",
+        ensemble: str = "nvt_langevin",
         ensemble_params: dict = None,  # {"name": "...", ...},
         log_file: Optional[PathLike] = None,
         log_interval: int = 1,
@@ -67,16 +67,14 @@ class MolecularDynamics(Simulation):
         self.dyn = self._build_dynamics()
 
     def _build_dynamics(self):
-        if self.ensemble_params is None:
-            self.ensemble_params = {}
-        forbidden_keys = ["timestep", "temperature_K", "temperature", "pressure_au", "externalstress"]
-        if any(val in self.ensemble_params for val in forbidden_keys):
-            raise ValueError(f"Keys {forbidden_keys} are forbidden in ensemble_params.")
-
         default_kwargs = _ensemble_default_params.get(self.ensemble, {})
-        self.ensemble_params.update(default_kwargs)
-
-        kwargs = deepcopy(self.ensemble_params)
+        kwargs = deepcopy(default_kwargs)
+        if self.ensemble_params is not None:
+            kwargs.update(self.ensemble_params)
+        self.ensemble_params = deepcopy(kwargs)
+        forbidden_keys = ["timestep", "temperature_K", "temperature", "pressure_au", "externalstress"]
+        if any(val in kwargs for val in forbidden_keys):
+            raise ValueError(f"Keys {forbidden_keys} are forbidden in ensemble_params.")
         if self.ensemble != "nve":
             kwargs["temperature_K"] = self.initial_temperature
         if self.ensemble == "npt_berendsen":
@@ -95,10 +93,13 @@ class MolecularDynamics(Simulation):
         return dyn
 
     def _make_log_entry(self):
+        PE = self.atoms.get_potential_energy() / len(self.atoms)
+        KE = self.atoms.get_kinetic_energy() / len(self.atoms)
         log_entry = {
             "time [ps]": self.timestep * self._step / 1000,
-            "PE [eV/atom]": self.atoms.get_potential_energy() / len(self.atoms),
-            "KE [eV/atom]": self.atoms.get_kinetic_energy() / len(self.atoms),
+            "PE [eV/atom]": PE,
+            "KE [eV/atom]": KE,
+            "TE [eV/atom]": PE + KE,
             "T [K]": self.atoms.get_kinetic_energy() / len(self.atoms) / (1.5 * units.kB),
             "T(target) [K]": self.temperature.curr_temperature(),
         }
@@ -106,6 +107,12 @@ class MolecularDynamics(Simulation):
             log_entry["P(target) [bar]"] = self.external_pressure
             log_entry["V [A^3]"] = self.atoms.get_volume()
             log_entry["rho (g/cm3)"] = self.atoms.get_masses().sum() / self.atoms.get_volume() / units.mol * 1e24
+        if self.ensemble == "nvt_nosehoover" and self.ensemble_params.get("debug", False):
+            from jax_md import simulate
+
+            log_entry["NHC_invariant"] = simulate.nvt_nose_hoover_invariant(
+                self.dyn.energy_fn, self.dyn.state, self.dyn.kT
+            ).item()
         return log_entry
 
     def step(self) -> bool:
