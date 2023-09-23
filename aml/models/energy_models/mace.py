@@ -52,6 +52,13 @@ def to_one_hot(indices: torch.Tensor, num_classes: int) -> torch.Tensor:
     return oh.view(*shape)
 
 
+def determine_interaction(residual: bool) -> type(torch.nn.Module):
+    if residual:
+        return RealAgnosticResidualInteractionBlock
+    else:
+        return RealAgnosticInteractionBlock
+
+
 @registry.register_energy_model("mace")
 class MACE(BaseEnergyModel):
     """A MACE (Multi-ACE) model.
@@ -88,7 +95,8 @@ class MACE(BaseEnergyModel):
         num_bessel: int = 8,
         num_polynomial_cutoff: int = 5,
         num_interactions: int = 2,
-        residual_first_interaction: bool = False,
+        residual_first_interaction: bool = True,
+        residual_interaction: bool = True,
         l_max: int = 3,
         hidden_irreps: str = "128x0e + 128x1o",
         correlation: int = 3,
@@ -103,6 +111,7 @@ class MACE(BaseEnergyModel):
         self.num_polynomial_cutoff = num_polynomial_cutoff
         self.l_max = l_max
         self.residual_first_interaction = residual_first_interaction
+        self.residual_interaction = residual_interaction
         self.correlation = correlation
         self.hidden_irreps = hidden_irreps
         self.MLP_irreps = MLP_irreps
@@ -153,31 +162,22 @@ class MACE(BaseEnergyModel):
         self.atomic_energies_fn = AtomicEnergiesBlock(self._atomic_energies)
 
         # Interactions
-        if residual_first_interaction:
-            inter = RealAgnosticResidualInteractionBlock(
-                node_attrs_irreps=node_attr_irreps,
-                node_feats_irreps=node_feats_irreps,
-                edge_attrs_irreps=sh_irreps,
-                edge_feats_irreps=edge_feats_irreps,
-                target_irreps=interaction_irreps,
-                hidden_irreps=hidden_irreps,
-                avg_num_neighbors=avg_num_neighbors,
-            )
-        else:
-            inter = RealAgnosticInteractionBlock(
-                node_attrs_irreps=node_attr_irreps,
-                node_feats_irreps=node_feats_irreps,
-                edge_attrs_irreps=sh_irreps,
-                edge_feats_irreps=edge_feats_irreps,
-                target_irreps=interaction_irreps,
-                hidden_irreps=hidden_irreps,
-                avg_num_neighbors=avg_num_neighbors,
-            )
+        first_interaction_cls = determine_interaction(residual_first_interaction)
+        interaction_cls = determine_interaction(residual_interaction)
+        inter = first_interaction_cls(
+            node_attrs_irreps=node_attr_irreps,
+            node_feats_irreps=node_feats_irreps,
+            edge_attrs_irreps=sh_irreps,
+            edge_feats_irreps=edge_feats_irreps,
+            target_irreps=interaction_irreps,
+            hidden_irreps=hidden_irreps,
+            avg_num_neighbors=avg_num_neighbors,
+        )
         self.interactions = torch.nn.ModuleList([inter])
 
         # Use the appropriate self connection at the first layer for proper E0
         use_sc_first = False
-        if "Residual" in str(RealAgnosticInteractionBlock):
+        if "Residual" in str(first_interaction_cls):
             use_sc_first = True
 
         node_feats_irreps_out = inter.target_irreps
@@ -199,7 +199,7 @@ class MACE(BaseEnergyModel):
                 hidden_irreps_out = str(hidden_irreps[0])  # Select only scalars for last layer
             else:
                 hidden_irreps_out = hidden_irreps
-            inter = RealAgnosticResidualInteractionBlock(
+            inter = interaction_cls(
                 node_attrs_irreps=node_attr_irreps,
                 node_feats_irreps=hidden_irreps,
                 edge_attrs_irreps=sh_irreps,
