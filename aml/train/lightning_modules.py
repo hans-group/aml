@@ -149,18 +149,11 @@ class PotentialTrainingModule(L.LightningModule):
     def _common_inference_step(self, batch, batch_idx, mode="val"):
         with torch.inference_mode(False):
             output = self._compute_output_and_loss(batch)
-        self.log("val_loss", output["loss"].item(), prog_bar=True, batch_size=get_batch_size(batch))
+        self.log(f"{mode}_loss", output["loss"].item(), prog_bar=True, batch_size=get_batch_size(batch))
 
         for metric, metric_fn in self.metric_fns.items():
             name = f"{mode}_{metric}"
-            self.log(
-                name,
-                metric_fn(batch, output).item(),
-                prog_bar=True,
-                batch_size=get_batch_size(batch),
-                on_step=True,
-                on_epoch=False,
-            )
+            self.log(name, metric_fn(batch, output).item(), prog_bar=True, batch_size=get_batch_size(batch))
 
         return output
 
