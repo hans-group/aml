@@ -1,13 +1,11 @@
 from os import PathLike
 
 import numpy as np
-import torch
 from ase import Atoms
+from ase.constraints import ExpCellFilter
 from ase.optimize import BFGS, FIRE, LBFGS, BFGSLineSearch, GPMin, LBFGSLineSearch, QuasiNewton
 
 from aml.common.utils import log_and_print
-from aml.data.data_structure import AtomsGraph
-from aml.simulations.ase_interface import AMLCalculator
 from aml.simulations.simulation import Simulation
 
 
@@ -30,52 +28,55 @@ class GeometryOptimization(Simulation):
     def __init__(
         self,
         atoms: Atoms,
-        algorithm: str = "torch_lbfgs",
+        algorithm: str = "quasi_newton",
         optimizer_config: dict | None = None,
+        optimize_cell: bool = False,
         max_force: float = 0.02,
         log_file: PathLike | None = None,
         log_interval: int = 1,
         trajectory: PathLike | None = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
+        *,
+        strain_mask: list[bool] | None = None,
+        constant_volume: bool = False,
     ):
+        """Class to perform geometry optimization on an ASE Atoms object.
+        Wraps ASE optimizers and provides logging and trajectory writing.
+
+        Args:
+            atoms (Atoms): ASE Atoms object to optimize.
+            algorithm (str, optional): ASE optimizer to use. Defaults to "quasi_newton".
+            optimizer_config (dict, optional): Configuration for the optimizer. Defaults to None.
+            optimize_cell (bool, optional): Whether to optimize the cell. Defaults to False.
+            max_force (float, optional): Maximum force allowed. Defaults to 0.02.
+            log_file (PathLike, optional): File to write log to. Defaults to None.
+            log_interval (int, optional): Interval to write log. Defaults to 1.
+            trajectory (PathLike, optional): File to write trajectory to. Defaults to None.
+            trajectory_interval (int, optional): Interval to write trajectory. Defaults to 1.
+            append_trajectory (bool, optional): Whether to append to trajectory file. Defaults to False.
+            strain_mask (list[bool], optional): The components of strains to ignore (if False).
+                The components are [aa, bb, cc, ab, bc, ca]. Defaults to None, which means no strain is ignored.
+            constant_volume (bool, optional): Whether to keep the volume constant. Defaults to False.
+        """
         super().__init__(atoms, log_file, log_interval, trajectory, trajectory_interval, append_trajectory)
-        self._energy = atoms.get_potential_energy()
-        self._fmax = get_max_force(atoms.get_forces())
+        if optimize_cell:
+            self._objective = ExpCellFilter(self.atoms, mask=strain_mask, constant_volume=constant_volume)
+        else:
+            self._objective = self.atoms
+
+        self._energy = self.atoms.get_potential_energy()
+        self._fmax = get_max_force(self._objective.get_forces())
         self.max_force = max_force
         self.algorithm = algorithm
         self.optimizer_config = optimizer_config or {}
-        self.converged = False
+        self.optimize_cell = optimize_cell
+        self.strain_mask = strain_mask
+        self.constant_volume = constant_volume
 
-        if self.algorithm == "torch_lbfgs":
-            self._setup_torch_opt(self.optimizer_config)
-        else:
-            self.optimizer = ase_optimizer_map[self.algorithm](self.atoms, **self.optimizer_config)
+        self.optimizer = ase_optimizer_map[self.algorithm](self._objective, **self.optimizer_config)
 
-    def _setup_torch_opt(self, optimizer_config):
-        if not isinstance(self.atoms.calc, AMLCalculator):
-            raise ValueError("For 'torch_lbfgs' algorithm, calculator must be AMLCalculator.")
-        self.model = self.atoms.calc.model
-
-        device = self.model.parameters().__next__().device
-        self.data = AtomsGraph.from_ase(self.atoms, self.model.cutoff).to(device).to_dict()
-        self.data["pos"].requires_grad = True
-        # Default values
-        lr = optimizer_config.pop("lr", 1.0)
-        max_iter = optimizer_config.pop("max_iter", 15)
-        line_search_fn = optimizer_config.pop("line_search_fn", None)
-        self.optimizer = torch.optim.LBFGS(
-            (self.data["pos"],), lr=lr, max_iter=max_iter, line_search_fn=line_search_fn, **optimizer_config
-        )
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=10, factor=0.5)
-
-        def closure():
-            self.optimizer.zero_grad()
-            energy = self.model(self.data)["energy"]
-            energy.backward()
-            return energy
-
-        self.closure = closure
+        self._converged = False
 
     def _make_log_entry(self) -> dict[str, str | int | float | bool]:
         log_entry = {
@@ -86,43 +87,22 @@ class GeometryOptimization(Simulation):
         }
         return log_entry
 
-    def _torch_step(self):
-        self.optimizer.step(self.closure)
-        output = self.model(self.data)
-        energy = output["energy"].detach().cpu().numpy().squeeze()
-        forces = output["force"].detach().cpu().numpy().squeeze()
-        fmax = get_max_force(forces)
-        self.scheduler.step(fmax)
-        self._energy = energy
-        self._fmax = fmax
-        self.atoms.set_positions(self.data["pos"].detach().cpu().numpy())
-
-    def _ase_step(self):
+    def step(self) -> None:
         self.optimizer.step()
         self._energy = self.atoms.get_potential_energy()
-        self._fmax = get_max_force(self.atoms.get_forces())
-
-    def step(self) -> None:
-        if self.algorithm == "torch_lbfgs":
-            self._torch_step()
-        else:
-            self._ase_step()
+        self._fmax = get_max_force(self._objective.get_forces())
         if self._fmax < self.max_force:
-            self.converged = True
-        return self.converged
+            self._converged = True
+        return self._converged
 
     def run(self, max_steps: int = 50) -> None:
-        if self.algorithm == "torch_lbfgs":
-            self.model.train()
         log_and_print(f"Inital energy: {self._energy:.6f}", self.log_file)
         log_and_print(f"Inital fmax: {self._fmax:.6f}", self.log_file)
         if self.trajectory is not None:
             with self.traj_writer as w:
                 w.write(self.atoms)
         super().run(max_steps)
-        if self.algorithm == "torch_lbfgs":
-            self.model.eval()
-        if not self.converged:
+        if not self._converged:
             log_and_print("Geometry optimization did not converge.", self.log_file)
             return False
         return True
