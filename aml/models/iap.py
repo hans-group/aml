@@ -33,6 +33,7 @@ class InterAtomicPotential(BaseModel):
         compute_stress: bool = False,
         compute_hessian: bool = False,
         return_embeddings: bool = False,
+        retain_graph: bool = False,
     ):
         super().__init__()
         self.energy_model = energy_model
@@ -41,6 +42,7 @@ class InterAtomicPotential(BaseModel):
         self._compute_hessian = compute_hessian
         self.return_embeddings = return_embeddings
         self.cutoff = self.energy_model.get_cutoff()
+        self.retain_graph = retain_graph
 
         grad_input_keys = []
         self.require_grad_keys = []
@@ -49,8 +51,9 @@ class InterAtomicPotential(BaseModel):
             self.require_grad_keys.append(K.pos)
         if self._compute_stress:
             grad_input_keys.append(K.edge_vec)
+        self.grad_input_keys = grad_input_keys
 
-        self.compute_grad = ComputeGradient(input_keys=grad_input_keys, output_key=K.energy)
+        self.get_compute_grad()
 
     @property
     def compute_force(self):
@@ -114,6 +117,16 @@ class InterAtomicPotential(BaseModel):
         if self.compute_hessian:
             keys.append(K.hessian)
         return tuple(keys)
+
+    def get_compute_grad(self):
+        if self.retain_graph:
+            print("debug, True")
+            self.compute_grad = ComputeGradient(
+                input_keys=self.grad_input_keys, output_key=K.energy, second_order_required=self.retain_graph
+            )
+        else:
+            print("debug, False")
+            self.compute_grad = ComputeGradient(input_keys=self.grad_input_keys, output_key=K.energy)
 
     def forward(self, data: DataDict) -> OutputDict:
         """Forward pass of the model.
