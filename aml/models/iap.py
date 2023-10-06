@@ -120,12 +120,10 @@ class InterAtomicPotential(BaseModel):
 
     def get_compute_grad(self):
         if self.retain_graph:
-            print("debug, True")
             self.compute_grad = ComputeGradient(
                 input_keys=self.grad_input_keys, output_key=K.energy, second_order_required=self.retain_graph
             )
         else:
-            print("debug, False")
             self.compute_grad = ComputeGradient(input_keys=self.grad_input_keys, output_key=K.energy)
 
     def forward(self, data: DataDict) -> OutputDict:
