@@ -6,6 +6,7 @@ from typing import Sequence, Union
 import numpy as np
 import torch
 from ase import Atoms
+from ase.constraints import FixAtoms
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.stress import voigt_6_to_full_3x3_stress
 from torch_geometric.data import Data
@@ -56,6 +57,7 @@ class AtomsGraph(Data):
         node_vec_features: OptTensor = None,
         edge_vec_features: OptTensor = None,
         global_vec_features: OptTensor = None,
+        constraints: OptTensor = None,
         add_batch: bool = False,
         **kwargs,
     ):
@@ -74,6 +76,7 @@ class AtomsGraph(Data):
         self.node_vec_features = node_vec_features
         self.edge_vec_features = edge_vec_features
         self.global_vec_features = global_vec_features
+        self.constraints = constraints
         if elems is not None:
             self.n_atoms = torch.tensor([elems.size(0)], dtype=torch.long)
 
@@ -157,9 +160,15 @@ class AtomsGraph(Data):
                 if stress.shape == (6,):
                     stress = voigt_6_to_full_3x3_stress(stress)
                 stress = torch.as_tensor(stress, dtype=_default_dtype, device=device)
+
         atoms_graph = cls(
             elems, pos, cell, None, None, energy, force, stress, n_atoms=n_atoms, add_batch=add_batch, **kwargs
         )
+        if len(atoms.constraints) > 0:
+            constraints = torch.as_tensor(atoms.constraints[0].index, dtype=_default_dtype, device=device)
+            atoms_graph.constraints = constraints
+            atoms_graph.n_constraints = torch.tensor([constraints.size(0)], dtype=torch.long)
+
         if neighborlist_cutoff is not None:
             atoms_graph.build_neighborlist(neighborlist_cutoff, self_interaction, neighborlist_backend)
         return atoms_graph
@@ -201,6 +210,8 @@ class AtomsGraph(Data):
             cell=self.cell.detach().cpu().numpy()[0] if pbc else None,
             pbc=pbc,
         )
+        if hasattr(self, "constraints"):
+            atoms.constraints = FixAtoms(self.constraints.detach().cpu().numpy())
         energy = self.energy.detach().cpu().item() if "energy" in self else None
         forces = self.force.detach().cpu().numpy() if "force" in self else None
         if energy is not None or forces is not None:
