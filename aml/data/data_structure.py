@@ -13,6 +13,7 @@ from torch_geometric.data import Data
 from torch_geometric.typing import OptTensor, Tensor
 
 from .neighbor_list import NeighborListBuilder, resolve_neighborlist_builder
+from .utils import find_fixatoms_constraint
 
 IndexType = Union[slice, Tensor, np.ndarray, Sequence]
 _default_dtype = torch.get_default_dtype()
@@ -57,7 +58,7 @@ class AtomsGraph(Data):
         node_vec_features: OptTensor = None,
         edge_vec_features: OptTensor = None,
         global_vec_features: OptTensor = None,
-        constraints: OptTensor = None,
+        fixed_atoms: OptTensor = None,
         add_batch: bool = False,
         **kwargs,
     ):
@@ -76,7 +77,7 @@ class AtomsGraph(Data):
         self.node_vec_features = node_vec_features
         self.edge_vec_features = edge_vec_features
         self.global_vec_features = global_vec_features
-        self.constraints = constraints
+        self.fixed_atoms = fixed_atoms
         if elems is not None:
             self.n_atoms = torch.tensor([elems.size(0)], dtype=torch.long)
 
@@ -164,10 +165,12 @@ class AtomsGraph(Data):
         atoms_graph = cls(
             elems, pos, cell, None, None, energy, force, stress, n_atoms=n_atoms, add_batch=add_batch, **kwargs
         )
-        if len(atoms.constraints) > 0:
-            constraints = torch.as_tensor(atoms.constraints[0].index, dtype=_default_dtype, device=device)
-            atoms_graph.constraints = constraints
-            atoms_graph.n_constraints = torch.tensor([constraints.size(0)], dtype=torch.long)
+
+        fixatom = find_fixatoms_constraint(atoms)
+        if fixatom is not None:
+            fixatoms_constraints = torch.as_tensor(fixatom.index, dtype=_default_dtype, device=device)
+            atoms_graph.fixed_atoms = fixatoms_constraints
+            atoms_graph.n_fixed_atoms = torch.tensor([fixatoms_constraints.size(0)], dtype=torch.long)
 
         if neighborlist_cutoff is not None:
             atoms_graph.build_neighborlist(neighborlist_cutoff, self_interaction, neighborlist_backend)
@@ -210,8 +213,8 @@ class AtomsGraph(Data):
             cell=self.cell.detach().cpu().numpy()[0] if pbc else None,
             pbc=pbc,
         )
-        if hasattr(self, "constraints"):
-            atoms.constraints = FixAtoms(self.constraints.detach().cpu().numpy())
+        if hasattr(self, "fixed_atoms"):
+            atoms.constraints = FixAtoms(self.fixed_atoms.detach().cpu().numpy())
         energy = self.energy.detach().cpu().item() if "energy" in self else None
         forces = self.force.detach().cpu().numpy() if "force" in self else None
         if energy is not None or forces is not None:
