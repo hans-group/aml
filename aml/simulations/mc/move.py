@@ -4,7 +4,7 @@ import numpy as np
 from ase import Atoms
 from ase_extension.neighborlist import neighbor_list
 
-from .utils import find_fixatoms_constraint
+from aml.data.utils import find_fixatoms_constraint
 
 
 class RandomMove:

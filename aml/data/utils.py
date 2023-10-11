@@ -3,6 +3,8 @@ import zlib
 from typing import Iterable, TypeVar
 
 import lmdb
+from ase import Atoms
+from ase.constraints import FixAtoms
 from torch_geometric.data import Data
 
 T = TypeVar("T")
@@ -70,3 +72,21 @@ def write_lmdb_dataset(
 
     db.sync()
     db.close()
+
+
+def find_fixatoms_constraint(atoms: Atoms) -> FixAtoms | None:
+    """If atoms as FixAtoms contraint, return it.
+    Otherwise returns None.
+
+    Args:
+        atoms(Atoms): A Atoms object.
+
+    Returns:
+        FixAtoms | None
+    """
+    if not atoms.constraints:
+        return None
+    for c in atoms.constraints:
+        if isinstance(c, FixAtoms):
+            return c
+    return None
