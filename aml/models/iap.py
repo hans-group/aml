@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 from ase import Atoms
 
@@ -32,6 +34,7 @@ class InterAtomicPotential(BaseModel):
         compute_force: bool = True,
         compute_stress: bool = False,
         compute_hessian: bool = False,
+        require_second_order_gradient: bool = False,
         return_embeddings: bool = False,
     ):
         super().__init__()
@@ -39,6 +42,8 @@ class InterAtomicPotential(BaseModel):
         self._compute_force = compute_force
         self._compute_stress = compute_stress
         self._compute_hessian = compute_hessian
+        # TODO: should warn this?
+        self._require_second_order_gradient = require_second_order_gradient or compute_hessian
         self.return_embeddings = return_embeddings
         self.cutoff = self.energy_model.get_cutoff()
 
@@ -49,8 +54,13 @@ class InterAtomicPotential(BaseModel):
             self.require_grad_keys.append(K.pos)
         if self._compute_stress:
             grad_input_keys.append(K.edge_vec)
+        self.grad_input_keys = grad_input_keys
 
-        self.compute_grad = ComputeGradient(input_keys=grad_input_keys, output_key=K.energy)
+        self.compute_grad = ComputeGradient(
+            input_keys=grad_input_keys,
+            output_key=K.energy,
+            second_order_required=self.require_second_order_gradient,
+        )
 
     @property
     def compute_force(self):
@@ -114,6 +124,30 @@ class InterAtomicPotential(BaseModel):
         if self.compute_hessian:
             keys.append(K.hessian)
         return tuple(keys)
+
+    @property
+    def require_second_order_gradient(self):
+        """Whether to compute second order gradient or not.
+        This option is used for computing hessian, or performing advanced sampling
+        such as adversarial attack.
+        """
+        if self._compute_hessian and not self._require_second_order_gradient:
+            warnings.warn(
+                "Computing hessian requires second order gradient, but "
+                "require_second_order_gradient is set to False. "
+                "Ignoring and setting it to True.",
+                stacklevel=1,
+            )
+            self._require_second_order_gradient = True
+
+        return self._require_second_order_gradient
+
+    @require_second_order_gradient.setter
+    def require_second_order_gradient(self, value):
+        if not value and self.compute_hessian:
+            raise ValueError("Computing hessian requires second order gradient.")
+        self._require_second_order_gradient = value
+        self.compute_grad.second_order_required = value
 
     def forward(self, data: DataDict) -> OutputDict:
         """Forward pass of the model.

@@ -9,6 +9,7 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from aml.data import keys as K
 from aml.data.data_structure import AtomsGraph
 from aml.models.iap import InterAtomicPotential
+from aml.nn.ensemble import EnsembleModel
 
 from .neighbors import NeighborlistUpdater
 
@@ -123,3 +124,50 @@ class AMLCalculator(Calculator):  # noqa: F821
             if not self.compute_hessian:
                 raise RuntimeError("Hessian calculation is not enabled.")
             self.results.update(hessian=output[K.hessian].detach().cpu().numpy().astype(np.float64))
+
+
+class EnsembleAMLCalculator(AMLCalculator):
+    def __init__(
+        self,
+        model: EnsembleModel,
+        device: str | None = None,
+        neighborlist_backend: Literal["ase", "matscipy", "torch"] = "ase",
+        neighborlist_skin: float = 0.0,
+        **kwargs,
+    ):
+        model.return_only_mean = True
+        model.compute_force = model.models[0].compute_force
+        model.compute_stress = model.models[0].compute_stress
+        model.compute_hessian = model.models[0].compute_hessian
+        model.cutoff = model.models[0].cutoff
+        super().__init__(model, device, neighborlist_backend, neighborlist_skin, **kwargs)
+
+    @property
+    def compute_force(self):
+        return self._compute_force
+
+    @compute_force.setter
+    def compute_force(self, value):
+        self._compute_force = value
+        for model in self.model.models:
+            model.compute_force = value
+
+    @property
+    def compute_stress(self):
+        return self._compute_stress
+
+    @compute_stress.setter
+    def compute_stress(self, value):
+        self._compute_stress = value
+        for model in self.model.models:
+            model.compute_stress = value
+
+    @property
+    def compute_hessian(self):
+        return self._compute_hessian
+
+    @compute_hessian.setter
+    def compute_hessian(self, value):
+        self._compute_hessian = value
+        for model in self.model.models:
+            model.compute_hessian = value

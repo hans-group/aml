@@ -95,9 +95,9 @@ class ASENeighborListBuilder(NeighborListBuilder):
         else:
             pbc = np.array([True, True, True])
         device = atoms_graph.pos.device
-        pos = atoms_graph.pos.cpu().numpy().astype(np.float64)
-        cell = atoms_graph.cell.squeeze().cpu().numpy().astype(np.float64)
-        elems = atoms_graph.elems.cpu().numpy().astype(np.int32)
+        pos = atoms_graph.pos.cpu().detach().numpy().astype(np.float64)
+        cell = atoms_graph.cell.squeeze().cpu().detach().numpy().astype(np.float64)
+        elems = atoms_graph.elems.cpu().detach().numpy().astype(np.int32)
 
         center_idx, neighbor_idx, offset = ase.neighborlist.primitive_neighbor_list(
             "ijS", pbc, cell, pos, self.cutoff, elems, self_interaction=self.self_interaction
@@ -128,9 +128,9 @@ class MatscipyNeighborListBuilder(NeighborListBuilder):
             pbc = np.array([True, True, True])
         device = atoms_graph.pos.device
         # matscipy.neighbours.neighbour_list fails for non-periodic systems
-        pos = atoms_graph.pos.cpu().numpy().astype(np.float64)
-        cell = atoms_graph.cell.squeeze().cpu().numpy().astype(np.float64)
-        elems = atoms_graph.elems.cpu().numpy().astype(np.int32)
+        pos = atoms_graph.pos.cpu().detach().numpy().astype(np.float64)
+        cell = atoms_graph.cell.squeeze().cpu().detach().numpy().astype(np.float64)
+        elems = atoms_graph.elems.cpu().detach().numpy().astype(np.int32)
         if not pbc.all():
             # put atoms in a box with periodic boundary conditions
             rmin = np.min(pos, axis=0)
