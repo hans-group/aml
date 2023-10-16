@@ -6,7 +6,8 @@ LICENSE file in the root directory of this source tree.
 """
 
 import torch
-from torch_geometric.utils import scatter
+
+from aml.common.scatter import scatter
 
 from .base_layers import Dense, ResidualLayer
 from .initializers import he_orthogonal_init
