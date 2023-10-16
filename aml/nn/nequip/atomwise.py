@@ -32,8 +32,8 @@ from typing import List, Optional
 import torch
 import torch.nn.functional
 from e3nn.o3 import Linear
-from torch_geometric.utils import scatter
 
+from aml.common.scatter import scatter
 from aml.data import keys as K
 from aml.nn.nequip import additional_keys as AK
 from aml.typing import DataDict
