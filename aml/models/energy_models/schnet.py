@@ -1,6 +1,5 @@
-from torch_geometric.utils import scatter
-
 from aml.common.registry import registry
+from aml.common.scatter import scatter
 from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.mlp import MLP
