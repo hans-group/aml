@@ -1,10 +1,10 @@
 from typing import Sequence, Tuple
 
 import torch
-from torch_geometric.utils import scatter
 from torch_sparse import SparseTensor
 from tqdm import tqdm
 
+from aml.common.scatter import scatter
 from aml.common.sparse_utils import sp_getitem
 from aml.common.utils import canocialize_species
 from aml.data import keys as K
