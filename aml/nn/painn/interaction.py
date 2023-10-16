@@ -1,8 +1,8 @@
 from typing import Tuple
 
 import torch
-from torch_geometric.utils import scatter
 
+from aml.common.scatter import scatter
 from aml.nn.mlp import MLP
 from aml.typing import Tensor
 
