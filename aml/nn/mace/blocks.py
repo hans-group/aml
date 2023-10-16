@@ -11,13 +11,11 @@ import numpy as np
 import torch.nn.functional
 from e3nn import nn, o3
 from e3nn.util.jit import compile_mode
-from torch_geometric.utils import scatter
 
-from .irreps_tools import (
-    linear_out_irreps,
-    reshape_irreps,
-    tp_out_irreps_with_instructions,
-)
+from aml.common.scatter import scatter
+
+from .irreps_tools import (linear_out_irreps, reshape_irreps,
+                           tp_out_irreps_with_instructions)
 from .radial import BesselBasis, PolynomialCutoff
 from .symmetric_contraction import SymmetricContraction
 
