@@ -7,11 +7,11 @@ LICENSE file in the root directory of this source tree.
 
 
 import torch
-from torch_geometric.utils import scatter
 from torch_scatter import segment_coo, segment_csr
 from torch_sparse import SparseTensor
 
 from aml.common.registry import registry
+from aml.common.scatter import scatter
 from aml.common.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.gemnet.atom_update_block import OutputBlock
@@ -55,7 +55,7 @@ class GemNetT(BaseEnergyModel):
         emb_size_trip (int): (Down-projected) Embedding size in the triplet message passing block.
         emb_size_rbf (int): Embedding size of the radial basis transformation.
         emb_size_cbf (int): Embedding size of the circular basis transformation (one angle).
-        emb_size_bil_trip (int): Embedding size of the edge embeddings in the triplet-based message passing block after 
+        emb_size_bil_trip (int): Embedding size of the edge embeddings in the triplet-based message passing block after
             the bilinear layer.
         num_before_skip (int): Number of residual blocks before the first skip connection.
         num_after_skip (int): Number of residual blocks after the first skip connection.
