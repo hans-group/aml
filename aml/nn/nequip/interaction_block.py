@@ -33,8 +33,8 @@ import torch
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
-from torch_geometric.utils import scatter
 
+from aml.common.scatter import scatter
 from aml.data import keys as K
 from aml.nn.activation import ShiftedSoftplus
 from aml.typing import DataDict
