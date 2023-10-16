@@ -4,9 +4,9 @@ from typing import Any, Dict, Literal
 import torch
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.loader import DataLoader
-from torch_geometric.utils import scatter
 
 from aml.common.registry import registry
+from aml.common.scatter import scatter
 from aml.common.utils import canocialize_species, compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.bpnn import ACSF
