@@ -3,7 +3,8 @@ from typing import Optional, Tuple
 import torch
 from torch import nn
 from torch_geometric.nn import MessagePassing
-from torch_scatter import scatter
+
+from aml.common.scatter import scatter
 
 from .embedding import CosineCutoff, act_class_mapping
 

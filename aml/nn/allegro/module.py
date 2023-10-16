@@ -5,8 +5,8 @@ from typing import List, Optional
 import torch
 from e3nn import o3
 from e3nn.util.jit import compile_mode
-from torch_geometric.utils import scatter
 
+from aml.common.scatter import scatter
 from aml.data import keys as K
 from aml.typing import DataDict
 

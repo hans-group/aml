@@ -2,13 +2,13 @@ import math
 from typing import Optional
 
 import torch
-from torch_geometric.utils import scatter
 
+from aml.common.scatter import scatter
 from aml.data import keys as K
 from aml.typing import DataDict
 
-from ..nequip.graph_mixin import GraphModuleMixin
 from ..nequip import additional_keys as AK
+from ..nequip.graph_mixin import GraphModuleMixin
 
 
 class EdgewiseReduce(GraphModuleMixin, torch.nn.Module):
