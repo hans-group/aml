@@ -14,8 +14,7 @@ from e3nn.util.jit import compile_mode
 
 from aml.common.scatter import scatter
 
-from .irreps_tools import (linear_out_irreps, reshape_irreps,
-                           tp_out_irreps_with_instructions)
+from .irreps_tools import linear_out_irreps, reshape_irreps, tp_out_irreps_with_instructions
 from .radial import BesselBasis, PolynomialCutoff
 from .symmetric_contraction import SymmetricContraction
 
