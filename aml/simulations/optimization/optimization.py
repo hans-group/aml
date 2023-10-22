@@ -34,6 +34,7 @@ class GeometryOptimization(Simulation):
         max_force: float = 0.02,
         log_file: PathLike | None = None,
         log_interval: int = 1,
+        append_log: bool = False,
         trajectory: PathLike | None = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
@@ -59,7 +60,7 @@ class GeometryOptimization(Simulation):
                 The components are [aa, bb, cc, ab, bc, ca]. Defaults to None, which means no strain is ignored.
             constant_volume (bool, optional): Whether to keep the volume constant. Defaults to False.
         """
-        super().__init__(atoms, log_file, log_interval, trajectory, trajectory_interval, append_trajectory)
+        super().__init__(atoms, log_file, log_interval, append_log, trajectory, trajectory_interval, append_trajectory)
         if optimize_cell:
             self._objective = ExpCellFilter(self.atoms, mask=strain_mask, constant_volume=constant_volume)
         else:

@@ -9,7 +9,6 @@ from aml.simulations.temperature_strategy import ConstantTemperature, Temperatur
 from .move import NeighborSwap, Swap
 
 
-
 class GrandCanonicalSingleMonteCarlo(Simulation):
     """Base class for performing Metropolis Monte-Carlo simulations in NVT ensemble."""
 
@@ -21,6 +20,7 @@ class GrandCanonicalSingleMonteCarlo(Simulation):
         temperature: TemperatureStrategy | float = 300.0,
         log_file: os.PathLike | None = None,
         log_interval: int = 1,
+        append_log: bool = False,
         trajectory: os.PathLike | None = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
@@ -34,7 +34,7 @@ class GrandCanonicalSingleMonteCarlo(Simulation):
         if isinstance(temperature, (float, int)):
             temperature = ConstantTemperature(temperature)
         self.temperature = temperature
-        super().__init__(atoms, log_file, log_interval, trajectory, trajectory_interval, append_trajectory)
+        super().__init__(atoms, log_file, log_interval, append_log, trajectory, trajectory_interval, append_trajectory)
 
     def compute_probabilty(self, atoms_i, atoms_j):
         E_i = atoms_i.get_potential_energy()
