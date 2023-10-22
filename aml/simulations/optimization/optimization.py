@@ -80,7 +80,6 @@ class GeometryOptimization(Simulation):
 
     def _make_log_entry(self) -> dict[str, str | int | float | bool]:
         log_entry = {
-            "Step": self._step,
             "PE [eV]": float(self._energy),
             "PE [eV/atom]": float(self._energy / len(self.atoms)),
             "F_max [eV/A]": float(self._fmax),
