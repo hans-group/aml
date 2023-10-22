@@ -15,6 +15,7 @@ class Simulation(ABC):
         atoms: Atoms,
         log_file: PathLike | None = None,
         log_interval: int = 1,
+        append_log: bool = False,
         trajectory: PathLike | None = None,
         trajectory_interval: int = 1,
         append_trajectory: bool = False,
@@ -25,7 +26,7 @@ class Simulation(ABC):
             raise ValueError("Atoms object must have a calculator.")
         self.log_file = log_file
         if log_file is not None:
-            if os.path.exists(log_file):
+            if os.path.exists(log_file) and not append_log:
                 os.remove(log_file)
         self.log_interval = log_interval
         self.trajectory = trajectory
