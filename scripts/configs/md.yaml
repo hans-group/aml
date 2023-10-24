@@ -1,0 +1,42 @@
+# I/O
+io:
+  input: input.xyz                # Path to input file
+  trajectory: md_traj.traj       # Path to trajectory file
+  log: md.log                     # Path to log file
+
+# Model
+model:
+  path: null                      # Path to model file
+  device: auto                    # Device to use (auto, cpu, cuda, cuda:0, ...)
+  calc:
+    neighborlist_backend: ase     # Neighborlist backend (ase, matscipy, torch)  
+    neighborlist_skin: 0.0        # Neighborlist update threshold
+  vdw: false                      # Disable vdW correction
+  # vdw:
+  #   method: dftd3                 # dftd3 or dftd4
+  #   damping: d3bj                 # only used when method == dftd3. options: d3bj, d3zero, ...
+  #   functional: PBE               # Use the functional which was used to train the model
+  #   three_body: false             # Use three-body term (same as 'atm' option in dftd3 and dftd4)
+
+# Optimization
+md:
+  timestep: 1.0                   # Timestep in fs
+  n_steps: 1000                   # Number of steps
+  temperature: 298.15             # K
+  external_pressure: null         # bar
+  ensemble: nvt_langevin
+  ensemble_params: null
+  log_interval: 1
+  trajectory_interval: 1
+  append_trajectory: false
+
+  # Temperature strategy
+  # temperature:
+  #   - constant:
+  #       temperature: 298.15
+  #       n_steps: ???
+  #   - linear:
+  #       initial_temperature: 298.15
+  #       final_temperature: 598.15
+  #       n_steps: ???
+

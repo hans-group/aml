@@ -1,0 +1,29 @@
+# I/O
+io:
+  input: input.xyz                # Path to input file
+  output: optimized.xyz           # Path to output file (optimized structure)
+  trajectory: opt_traj.traj       # Path to trajectory file
+  log: opt.log                    # Path to log file
+
+# Model
+model:
+  path: null                      # Path to model file
+  device: auto                    # Device to use (auto, cpu, cuda, cuda:0, ...)
+  calc:
+    neighborlist_backend: ase     # Neighborlist backend (ase, matscipy, torch)  
+    neighborlist_skin: 0.0        # Neighborlist update threshold
+  vdw: false                    # Disable vdW correction
+  # vdw:
+  #   method: dftd3                 # dftd3 or dftd4
+  #   damping: d3bj                 # only used when method == dftd3. options: d3bj, d3zero, ...
+  #   functional: PBE               # Use the functional which was used to train the model
+  #   three_body: false             # Use three-body term (same as 'atm' option in dftd3 and dftd4)
+
+# Optimization
+opt:
+  algorithm: quasi_newton         # Optimization algorithm (bfgs, lbfgs, quasi_newton, fire, ...)
+  max_iter: 300                   # Maximum number of iterations
+  max_force: 0.02                 # Maximum force threshold in eV/Ang
+  optimize_cell: false            # Optimize cell parameters
+  strain_mask: null               # Mask for strain optimization. [xx, yy, zz, yz, xz, xy]
+  constant_volume: false          # Keep the volume constant during optimization
