@@ -6,13 +6,13 @@ from typing import Sequence, Union
 import numpy as np
 import torch
 from ase import Atoms
-from ase.constraints import FixAtoms
 from ase.calculators.singlepoint import SinglePointCalculator
+from ase.constraints import FixAtoms
 from ase.stress import voigt_6_to_full_3x3_stress
 from torch_geometric.data import Data
 from torch_geometric.typing import OptTensor, Tensor
 
-from .neighbor_list import NeighborListBuilder, resolve_neighborlist_builder
+from .neighbor_list import NeighborListBuilder, minimum_distance_to_cell, resolve_neighborlist_builder
 from .utils import find_fixatoms_constraint
 
 IndexType = Union[slice, Tensor, np.ndarray, Sequence]
@@ -189,6 +189,20 @@ class AtomsGraph(Data):
             self_interaction (bool, optional): Whether to add atom as neighbor of itself(=self loop). Defaults to False.
             backend (Union[str, NeighborListBuilder], optional): The backend for building neighborlist.
         """
+        if backend == "auto":
+            if "cell" not in self:
+                cell = torch.zeros((1, 3, 3))
+            cell = self.cell.squeeze().numpy()
+            if np.allclose(cell, np.zeros((3, 3))):
+                backend = "matscipy"
+            else:
+                cell_center = np.sum(cell, axis=0) / 2
+                min_cell_dist = minimum_distance_to_cell(cell_center, cell)
+                if min_cell_dist < cutoff:
+                    backend = "matscipy"
+                else:
+                    backend = "ase"
+
         neighborlist_builder_cls = resolve_neighborlist_builder(backend)
         neighborlist_builder: NeighborListBuilder = neighborlist_builder_cls(cutoff, self_interaction)
         center_idx, neigh_idx, edge_shift = neighborlist_builder.build(self)

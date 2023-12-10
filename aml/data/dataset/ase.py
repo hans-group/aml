@@ -45,7 +45,7 @@ class ASEDataset(InMemoryDataset, BaseDataset):
         self,
         data_source: str | list[str] | Images | list[Images] = None,
         index: str | list[str] = ":",
-        neighborlist_cutoff: float = 5.0,
+        neighborlist_cutoff: float | None = None,
         neighborlist_backend: Literal["ase", "matscipy", "torch"] = "ase",
         progress_bar: bool = True,
         transform: BaseTransform = None,
@@ -143,7 +143,10 @@ def read_ase_datapipe(data_source: list[str] | list[Images], index: list[str]) -
 
 
 def a2g_datapipe(
-    atoms_dp: IterDataPipe, neighborlist_cutoff: float, neighborlist_backend: str, read_properties: bool
+    atoms_dp: IterDataPipe,
+    neighborlist_cutoff: float | None,
+    neighborlist_backend: str,
+    read_properties: bool,
 ) -> IterDataPipe:
     """Atoms to graph datapipe.
 
@@ -156,5 +159,6 @@ def a2g_datapipe(
         IterDataPipe: Data pipeline that yields AtomsGraph.
     """
     dp = atoms_dp.atoms_to_graph(read_properties=read_properties)
-    dp = dp.build_neighbor_list(cutoff=neighborlist_cutoff, backend=neighborlist_backend)
+    if neighborlist_cutoff is not None:
+        dp = dp.build_neighbor_list(cutoff=neighborlist_cutoff, backend=neighborlist_backend)
     return dp

@@ -1,4 +1,4 @@
-from . import dataset, keys, neighbor_list
+from . import dataset, keys, neighbor_list, transforms
 from .data_structure import AtomsGraph
 from .dataset import ASEDataset, BaseDataset, LMDBDataset
 
@@ -10,4 +10,5 @@ __all__ = [
     "LMDBDataset",
     "keys",
     "neighbor_list",
+    "transforms"
 ]
