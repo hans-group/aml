@@ -21,6 +21,8 @@ from aml.data.utils import write_lmdb_dataset
 class BaseDataset(Dataset, Configurable, ABC):
     """Abstract base class for graph dataset."""
 
+    ignored_config_keys = ("transform",)
+
     def subset(self, size: int | float, seed: int = 0, return_idx: bool = False) -> Self:
         """Create a subset of the dataset with specified size.
 

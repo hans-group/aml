@@ -6,6 +6,7 @@ from pathlib import Path
 import lmdb
 import numpy as np
 from torch_geometric.data.data import BaseData
+from torch_geometric.transforms import BaseTransform
 
 from aml.common.registry import registry
 from aml.data.utils import is_pkl, maybe_list
@@ -25,7 +26,7 @@ class LMDBDataset(BaseDataset):
         collate_data (bool, optional): Whether to collate data into a Batch. Defaults to False.
     """
 
-    def __init__(self, db_path: str | list[str]):
+    def __init__(self, db_path: str | list[str], transform: BaseTransform | None = None):
         super().__init__()
         self.db_path = maybe_list(db_path)
 
@@ -33,6 +34,7 @@ class LMDBDataset(BaseDataset):
         self.db_lengths = [self.get_db_length(env) for env in self.envs]
         self.cumsum_db_lengths = np.cumsum(self.db_lengths).tolist()
         self.db_indices = [list(range(length)) for length in self.db_lengths]
+        self.transform = transform
 
     @staticmethod
     def connect_db(lmdb_path: Path | None = None) -> lmdb.Environment:

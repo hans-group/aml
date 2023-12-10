@@ -6,6 +6,7 @@ from typing import Literal
 import torch
 from ase import Atoms
 from torch_geometric.data.dataset import IndexType
+from torch_geometric.transforms import BaseTransform
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 from tqdm import tqdm
 from typing_extensions import Self
@@ -39,6 +40,7 @@ class ASEDataset(InMemoryDataset, BaseDataset):
         atomref_energies (dict[str, float], optional): Atomic reference energies. Defaults to None.
             Warning: This argument is deprecated and the values will be ignored.
     """
+
     def __init__(
         self,
         data_source: str | list[str] | Images | list[Images] = None,
@@ -46,6 +48,7 @@ class ASEDataset(InMemoryDataset, BaseDataset):
         neighborlist_cutoff: float = 5.0,
         neighborlist_backend: Literal["ase", "matscipy", "torch"] = "ase",
         progress_bar: bool = True,
+        transform: BaseTransform = None,
         atomref_energies: dict[str, float] | None = None,  # Deprecated
     ):
         data_source = maybe_list(data_source)
@@ -79,6 +82,7 @@ class ASEDataset(InMemoryDataset, BaseDataset):
             dp = tqdm(dp) if self.progress_bar else dp
 
         InMemoryDataset.__init__(self, dp)
+        self.transform = transform
 
     def __getitem__(self, idx: IndexType) -> Self | AtomsGraph:
         item = InMemoryDataset.__getitem__(self, idx)

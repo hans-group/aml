@@ -41,6 +41,7 @@ class Configurable:
     """
 
     supported_val_types = (str, bool, Number, type(None))
+    ignored_config_keys = ()
 
     def get_config(self, param_name_map: dict[str, str] | None = None) -> dict[str, Any]:
         """Get the config of the object.
@@ -75,6 +76,8 @@ class Configurable:
 
         config = {}
         for arg in args:
+            if arg in self.ignored_config_keys:
+                continue
             argname = param_name_map.get(arg, arg)
             try:
                 val = getattr(self, argname)
