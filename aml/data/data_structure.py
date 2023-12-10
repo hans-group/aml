@@ -198,7 +198,7 @@ class AtomsGraph(Data):
             else:
                 cell_center = np.sum(cell, axis=0) / 2
                 min_cell_dist = minimum_distance_to_cell(cell_center, cell)
-                if min_cell_dist < cutoff:
+                if min_cell_dist > cutoff:
                     backend = "matscipy"
                 else:
                     backend = "ase"
