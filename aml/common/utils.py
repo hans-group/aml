@@ -15,7 +15,7 @@ import ase.data
 import numpy as np
 import torch
 
-from aml.typing import DataDict, Tensor
+from aml.typing import Tensor
 
 
 def _get_init_args(cls) -> tuple[list[str], list[Any]]:
@@ -183,8 +183,6 @@ def remove_unused_kwargs(func: callable, kwargs: dict[str, Any]) -> dict[str, An
     """
     valid_args = inspect.signature(func).parameters
     return {k: v for k, v in kwargs.items() if k in valid_args}
-
-
 
 
 def canocialize_species(species: Tensor | list[int] | list[str]) -> Tensor:
