@@ -9,7 +9,7 @@ from torch_geometric.utils import unbatch
 from tqdm import tqdm
 
 from aml.common.registry import registry
-from aml.common.utils import get_batch_size
+from aml.data.utils import get_batch_size
 from aml.data import keys as K
 from aml.models.iap import InterAtomicPotential
 from aml.train.loss import WeightedSumLoss

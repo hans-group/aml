@@ -16,7 +16,7 @@ from torch.nn import functional as F
 
 from aml.common.registry import registry
 from aml.common.scatter import scatter
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.data.dataset.base import BaseDataset
 from aml.nn.mace.blocks import (

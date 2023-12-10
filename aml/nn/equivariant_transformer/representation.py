@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.typing import DataDict
 

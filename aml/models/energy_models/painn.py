@@ -2,7 +2,7 @@ from typing import Literal
 
 from aml.common.registry import registry
 from aml.common.scatter import scatter
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.mlp import MLP
 from aml.nn.painn.representation import PaiNNRepresentation

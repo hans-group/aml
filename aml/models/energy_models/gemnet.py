@@ -12,7 +12,7 @@ from torch_sparse import SparseTensor
 
 from aml.common.registry import registry
 from aml.common.scatter import scatter
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.nn.gemnet.atom_update_block import OutputBlock
 from aml.nn.gemnet.base_layers import Dense

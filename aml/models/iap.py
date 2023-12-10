@@ -4,7 +4,7 @@ import torch
 from ase import Atoms
 
 from aml.common.registry import registry
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.data.data_structure import AtomsGraph
 from aml.models.energy_models.base import BaseEnergyModel

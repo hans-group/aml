@@ -4,7 +4,7 @@ import torch
 from e3nn import o3
 
 from aml.common.registry import registry
-from aml.common.utils import compute_neighbor_vecs
+from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.models.energy_models.nequip import AtomTypeMapping
 from aml.nn.allegro import Allegro_Module, EdgewiseEnergySum, NormalizedBasis, ScalarMLP

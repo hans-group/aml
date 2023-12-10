@@ -15,7 +15,6 @@ import ase.data
 import numpy as np
 import torch
 
-from aml.data import keys as K
 from aml.typing import DataDict, Tensor
 
 
@@ -186,32 +185,6 @@ def remove_unused_kwargs(func: callable, kwargs: dict[str, Any]) -> dict[str, An
     return {k: v for k, v in kwargs.items() if k in valid_args}
 
 
-def compute_neighbor_vecs(data: DataDict) -> DataDict:
-    """Compute the vectors between atoms and their neighbors (i->j)
-    and store them in ``data[K.edge_vec]``.
-    The ``data`` must contain ``data[K.pos]``, ``data[K.edge_index]``, ``data[K.edge_shift]``,
-    This function should be called inside ``forward`` since the dependency of neighbor positions
-    on atomic positions needs to be tracked by autograd in order to appropriately compute forces.
-
-    Args:
-        data (DataDict): The data dictionary.
-
-    Returns:
-        DataDict: The data dictionary with ``data[K.edge_vec]``.
-    """
-    batch = data[K.batch]
-    pos = data[K.pos]
-    edge_index = data[K.edge_index]  # neighbors
-    edge_shift = data[K.edge_shift]  # shift vectors
-    batch_size = int((batch.max() + 1).item())
-    cell = data[K.cell] if "cell" in data else torch.zeros((batch_size, 3, 3)).to(pos.device)
-    idx_i = edge_index[1]
-    idx_j = edge_index[0]
-
-    edge_batch = batch[idx_i]  # batch index for edges(neighbors)
-    edge_vec = pos[idx_j] - pos[idx_i] + torch.einsum("ni,nij->nj", edge_shift, cell[edge_batch])
-    data[K.edge_vec] = edge_vec
-    return data
 
 
 def canocialize_species(species: Tensor | list[int] | list[str]) -> Tensor:
@@ -235,20 +208,6 @@ def canocialize_species(species: Tensor | list[int] | list[str]) -> Tensor:
     elif isinstance(species, np.ndarray):
         species = torch.as_tensor(species, dtype=torch.long)
     return species
-
-
-def get_batch_size(batch: DataDict) -> int:
-    """Get the batch size of a data batch.
-
-    Args:
-        batch (DataDict): The data batch.
-
-    Returns:
-        int: The batch size.
-    """
-    if K.batch in batch:
-        return batch[K.batch][-1] + 1
-    return 1
 
 
 def load_config(filepath: PathLike) -> dict:
