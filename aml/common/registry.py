@@ -145,7 +145,7 @@ def _find_all_pl_callbacks():
     }
     all_callbacks.pop("callback")
     all_callbacks.pop("checkpoint")
-    all_callbacks.pop("model_checkpoint")
+
     return all_callbacks
 
 
