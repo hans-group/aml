@@ -4,9 +4,9 @@ import torch
 from ase import Atoms
 
 from aml.common.registry import registry
-from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.data.data_structure import AtomsGraph
+from aml.data.utils import compute_neighbor_vecs
 from aml.models.energy_models.base import BaseEnergyModel
 from aml.nn.grad import ComputeGradient
 from aml.typing import DataDict, OutputDict
@@ -215,6 +215,16 @@ class InterAtomicPotential(BaseModel):
             return model
         else:
             raise NotImplementedError("Currently only support .ckpt file")
+
+    def to_calculator(self, neighborlist_backend="ase", neighborlist_skin=0.0):
+        # Import is here to prevent circular import
+        from aml.simulations.ase_interface import AMLCalculator
+
+        device = self.parameters().__next__().device
+        calc = AMLCalculator(
+            self, device=device, neighborlist_backend=neighborlist_backend, neighborlist_skin=neighborlist_skin
+        )
+        return calc
 
 
 def get_force(data: DataDict, outputs: OutputDict, grad_vals: DataDict, compute_hessian: bool = False):
