@@ -4,6 +4,23 @@
 # This program is distributed under the MIT License (see MIT.md)
 ###########################################################################################
 
+"""Code adapted from MACE. Below is the original license.
+
+MIT License
+
+Copyright (c) 2022 ACEsuit/mace
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+"""
+
 
 import warnings
 from typing import List, Literal
@@ -16,9 +33,9 @@ from torch.nn import functional as F
 
 from aml.common.registry import registry
 from aml.common.scatter import scatter
-from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
 from aml.data.dataset.base import BaseDataset
+from aml.data.utils import compute_neighbor_vecs
 from aml.nn.mace.blocks import (
     AtomicEnergiesBlock,
     EquivariantProductBasisBlock,

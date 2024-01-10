@@ -6,12 +6,7 @@ import torch
 import torch.nn as nn
 import torch_geometric
 
-from .activation import (
-    GateActivation,
-    S2Activation,
-    SeparableS2Activation,
-    SmoothLeakyReLU,
-)
+from .activation import GateActivation, S2Activation, SeparableS2Activation, SmoothLeakyReLU
 from .drop import EquivariantDropoutArraySphericalHarmonics, GraphDropPath
 from .layer_norm import get_normalization_layer
 from .radial_function import RadialFunction

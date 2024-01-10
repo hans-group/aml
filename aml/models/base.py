@@ -12,6 +12,7 @@ class BaseModel(torch.nn.Module, Configurable, ABC):
     """Base class for models.
     All models should inherit from this class.
     """
+
     @property
     @abstractmethod
     def output_keys(self) -> tuple[str, ...]:

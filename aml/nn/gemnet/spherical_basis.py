@@ -46,13 +46,9 @@ class CircularBasisLayer(torch.nn.Module):
         del cbf_hparams["name"]
 
         if cbf_name == "gaussian":
-            self.cosφ_basis = GaussianSmearing(
-                start=-1, stop=1, num_gaussians=num_spherical, **cbf_hparams
-            )
+            self.cosφ_basis = GaussianSmearing(start=-1, stop=1, num_gaussians=num_spherical, **cbf_hparams)
         elif cbf_name == "spherical_harmonics":
-            Y_lm = real_sph_harm(
-                num_spherical, use_theta=False, zero_m_only=True
-            )
+            Y_lm = real_sph_harm(num_spherical, use_theta=False, zero_m_only=True)
             sph_funcs = []  # (num_spherical,)
 
             # convert to tensorflow functions
@@ -60,22 +56,12 @@ class CircularBasisLayer(torch.nn.Module):
             modules = {"sin": torch.sin, "cos": torch.cos, "sqrt": torch.sqrt}
             m_order = 0  # only single angle
             for l_degree in range(len(Y_lm)):  # num_spherical
-                if (
-                    l_degree == 0
-                ):  # Y_00 is only a constant -> function returns value and not tensor
-                    first_sph = sym.lambdify(
-                        [z], Y_lm[l_degree][m_order], modules
-                    )
-                    sph_funcs.append(
-                        lambda z: torch.zeros_like(z) + first_sph(z)
-                    )
+                if l_degree == 0:  # Y_00 is only a constant -> function returns value and not tensor
+                    first_sph = sym.lambdify([z], Y_lm[l_degree][m_order], modules)
+                    sph_funcs.append(lambda z: torch.zeros_like(z) + first_sph(z))
                 else:
-                    sph_funcs.append(
-                        sym.lambdify([z], Y_lm[l_degree][m_order], modules)
-                    )
-            self.cosφ_basis = lambda cosφ: torch.stack(
-                [f(cosφ) for f in sph_funcs], dim=1
-            )
+                    sph_funcs.append(sym.lambdify([z], Y_lm[l_degree][m_order], modules))
+            self.cosφ_basis = lambda cosφ: torch.stack([f(cosφ) for f in sph_funcs], dim=1)
         else:
             raise ValueError(f"Unknown cosine basis function '{cbf_name}'.")
 
@@ -85,9 +71,7 @@ class CircularBasisLayer(torch.nn.Module):
 
         if not self.efficient:
             rbf = rbf[id3_ca]  # (num_triplets, num_radial)
-            out = (rbf[:, None, :] * cbf[:, :, None]).view(
-                -1, rbf.shape[-1] * cbf.shape[-1]
-            )
+            out = (rbf[:, None, :] * cbf[:, :, None]).view(-1, rbf.shape[-1] * cbf.shape[-1])
             return (out,)
             # (num_triplets, num_radial * num_spherical)
         else:

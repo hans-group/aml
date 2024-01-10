@@ -2,13 +2,14 @@ import pickle
 import zlib
 from typing import Iterable, TypeVar
 
-import torch
 import lmdb
+import torch
 from ase import Atoms
 from ase.constraints import FixAtoms
 from torch_geometric.data import Data
 
 from aml.typing import DataDict
+
 from . import keys as K
 
 T = TypeVar("T")
@@ -123,6 +124,7 @@ def compute_neighbor_vecs(data: DataDict) -> DataDict:
     data[K.edge_vec] = edge_vec
     return data
 
+
 def get_batch_size(batch: DataDict) -> int:
     """Get the batch size of a data batch.
 
@@ -135,4 +137,3 @@ def get_batch_size(batch: DataDict) -> int:
     if K.batch in batch:
         return batch[K.batch][-1] + 1
     return 1
-

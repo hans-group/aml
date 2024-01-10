@@ -8,8 +8,8 @@ from torch_geometric.loader import DataLoader
 from aml.common.registry import registry
 from aml.common.scatter import scatter
 from aml.common.utils import canocialize_species
-from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
+from aml.data.utils import compute_neighbor_vecs
 from aml.nn.bpnn import ACSF
 from aml.nn.bpnn.acsf import _default_acsf_params
 from aml.typing import DataDict, Tensor

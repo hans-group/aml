@@ -37,8 +37,8 @@ SOFTWARE.
 """
 from aml.common.registry import registry
 from aml.common.scatter import scatter
-from aml.data.utils import compute_neighbor_vecs
 from aml.data import keys as K
+from aml.data.utils import compute_neighbor_vecs
 from aml.nn.mlp import MLP
 from aml.nn.schnet.representation import SchNetRepresentation
 from aml.typing import DataDict, Tensor
@@ -63,6 +63,7 @@ class SchNet(BaseEnergyModel):
         n_rbf (int): Number of radial basis functions. Defaults to 50.
         trainable_rbf (bool): Whether to train the radial basis functions. Defaults to False.
     """
+
     embedding_keys = [K.node_features]
 
     def __init__(

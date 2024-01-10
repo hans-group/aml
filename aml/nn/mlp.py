@@ -20,6 +20,7 @@ class MLP(torch.nn.Module):
         w_init (str): Weight initializer. Defaults to "xavier_uniform".
         b_init (str): Bias initializer. Defaults to "zeros".
     """
+
     def __init__(
         self,
         n_input: int,

@@ -1,19 +1,20 @@
 import os
+import shutil
 import urllib.request
 import zipfile
-import shutil
 
 import ase.io
 import numpy as np
 from ase import Atoms, units
 from ase.calculators.singlepoint import SinglePointCalculator as sp
-from aml.data.dataset import InMemoryDataset
-from aml.data.datapipes import ASEFileReader, AtomsGraphParser, NeighborListBuilder
 from torchdata.datapipes.iter import IterableWrapper
 from tqdm import tqdm
 
+from aml.data.datapipes import ASEFileReader, AtomsGraphParser, NeighborListBuilder
+
 # Import InMemoryDataset
 from aml.data.dataset import InMemoryDataset
+
 
 def make_dp(src, neighbor_cutoff):
     dp = IterableWrapper(src)
@@ -35,6 +36,7 @@ def npz_to_ase(npz):
         images.append(atoms)
     return images
 
+
 def create_ccsd_t_dataset():
     url = "http://www.quantum-machine.org/gdml/data/npz/ethanol_ccsd_t.zip"
     urllib.request.urlretrieve(url, "ethanol_ccsd_t.zip")
@@ -43,16 +45,16 @@ def create_ccsd_t_dataset():
         zip_ref.extractall("ethanol_ccsd_t")
     # Remove the zip file
     os.remove("ethanol_ccsd_t.zip")
-    
+
     # Load the data
     train_images = npz_to_ase(np.load("ethanol_ccsd_t/ethanol_ccsd_t-train.npz"))
     test_images = npz_to_ase(np.load("ethanol_ccsd_t/ethanol_ccsd_t-test.npz"))
 
     shutil.rmtree("ethanol_ccsd_t")
-    
+
     train_dp = tqdm(make_dp(train_images, 5.0), desc="Processing training dataset")
     test_dp = tqdm(make_dp(test_images, 5.0), desc="Processing test dataset")
     train_dataset = InMemoryDataset(train_dp)
     test_dataset = InMemoryDataset(test_dp)
-    
+
     return train_dataset, test_dataset
