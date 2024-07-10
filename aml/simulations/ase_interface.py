@@ -109,8 +109,11 @@ class AMLCalculator(Calculator):  # noqa: F821
 
         output = self.model(data.to_dict())
         energy = output[K.energy].detach().cpu().item()
+        self.results.update(energy=energy)
         if "energy" in properties:
-            self.results.update(energy=energy, free_energy=energy)
+            self.results.update(energy=energy)
+        if "free_energy" in properties:
+            self.results.update(free_energy=energy)
         if "forces" in properties:
             if not self.compute_force:
                 raise RuntimeError("Force calculation is not enabled.")
