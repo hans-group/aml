@@ -3,20 +3,20 @@ from os import PathLike
 from typing import Optional
 
 from ase import units
-from ase.md import Andersen, Langevin, VelocityVerlet
+from ase.md import Andersen, VelocityVerlet
 from ase.md.npt import NPT
 from ase.md.nptberendsen import NPTBerendsen
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
 from aml.common.utils import log_and_print
-from aml.simulations.md.ensembles.nosehoover import NVTNoseHoover
+from aml.simulations.md.ensembles import Langevin, NVTNoseHoover
 from aml.simulations.simulation import Simulation
 from aml.simulations.temperature_strategy import ConstantTemperature, TemperatureStrategy
 
 _ensemble_maps = {
     "nve": VelocityVerlet,
-    "nvt_langevin": Langevin,
+    "nvt_langevin": Langevin, # It is Langevin integrator from ASE v3.22.1
     "nvt_andersen": Andersen,
     "nvt_berendsen": NVTBerendsen,
     "nvt_nosehoover": NVTNoseHoover,
